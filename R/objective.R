@@ -58,7 +58,7 @@ qr_objective <- function(X, y, beta, tau = 0.5, lambda = 0,
 }
 
 client_weight_vector <- function(client_sizes,
-                                 client_weighting = c("sample", "uniform", "sqrt_size", "custom"),
+                                 client_weighting = c("sample", "uniform", "sqrt_size", "custom", "adaptive"),
                                  client_weights = NULL) {
   client_weighting <- match.arg(client_weighting)
   client_sizes <- as.numeric(client_sizes)
@@ -69,6 +69,20 @@ client_weight_vector <- function(client_sizes,
     sample = client_sizes / sum(client_sizes),
     uniform = rep(1 / length(client_sizes), length(client_sizes)),
     sqrt_size = sqrt(client_sizes) / sum(sqrt(client_sizes)),
+    adaptive = {
+      if (is.null(client_weights)) {
+        client_sizes / sum(client_sizes)
+      } else {
+        client_weights <- as.numeric(client_weights)
+        if (length(client_weights) != length(client_sizes)) {
+          stop("client_weights must have one entry per client.", call. = FALSE)
+        }
+        if (any(!is.finite(client_weights)) || any(client_weights < 0) || sum(client_weights) <= 0) {
+          stop("client_weights must be finite, nonnegative, and have positive sum.", call. = FALSE)
+        }
+        client_weights / sum(client_weights)
+      }
+    },
     custom = {
       if (is.null(client_weights)) {
         stop("client_weights must be supplied when client_weighting = 'custom'.", call. = FALSE)
@@ -88,7 +102,7 @@ client_weight_vector <- function(client_sizes,
 
 client_qr_objective <- function(X, y, beta, client_indices, tau = 0.5, lambda = 0,
                                 penalty = c("none", "l1", "mcp", "scad"),
-                                client_weighting = c("sample", "uniform", "sqrt_size", "custom"),
+                                client_weighting = c("sample", "uniform", "sqrt_size", "custom", "adaptive"),
                                 client_weights = NULL, penalty_factor = NULL,
                                 mcp_gamma = 3, scad_a = 3.7) {
   penalty <- match.arg(penalty)
@@ -186,6 +200,65 @@ calibrate_quantile_intercept <- function(X, y, beta, tau = 0.5, client_indices =
     as.numeric(stats::quantile(residual[idx], tau, names = FALSE))
   }, numeric(1))
   list(beta = beta, offsets = offsets, mode = mode)
+}
+
+adaptive_calibrate_quantile <- function(X, y, beta, tau = 0.5, client_indices = NULL,
+                                        metric = c("mean_client", "worst_client", "global")) {
+  metric <- match.arg(metric)
+  X <- as.matrix(X)
+  y <- as.numeric(y)
+  beta <- as.numeric(beta)
+
+  raw <- calibration_summary(X, y, beta, tau = tau, client_indices = client_indices)
+  candidates <- list(raw = list(beta = beta, offsets = NULL, selected_mode = "raw"))
+
+  j0 <- intercept_column(X)
+  if (!is.na(j0)) {
+    global <- calibrate_quantile_intercept(X, y, beta, tau = tau, mode = "global")
+    candidates$global_intercept <- list(
+      beta = global$beta,
+      offsets = NULL,
+      selected_mode = "global_intercept"
+    )
+  }
+
+  if (!is.null(client_indices)) {
+    client <- calibrate_quantile_intercept(
+      X, y, beta,
+      tau = tau,
+      client_indices = client_indices,
+      mode = "client_offset"
+    )
+    candidates$client_offset <- list(
+      beta = client$beta,
+      offsets = client$offsets,
+      selected_mode = "client_offset"
+    )
+  }
+
+  scores <- vapply(candidates, function(candidate) {
+    summary <- calibration_summary(
+      X, y, candidate$beta,
+      tau = tau,
+      client_indices = client_indices,
+      offsets = candidate$offsets
+    )
+    switch(
+      metric,
+      global = summary$global_coverage_error,
+      mean_client = summary$mean_client_coverage_error,
+      worst_client = summary$worst_client_coverage_error
+    )
+  }, numeric(1))
+
+  best_name <- names(which.min(scores))[1]
+  best <- candidates[[best_name]]
+  best$mode <- "adaptive"
+  best$metric <- metric
+  best$score <- scores[[best_name]]
+  best$scores <- scores
+  best$raw_summary <- raw
+  best
 }
 
 calibration_summary <- function(X, y, beta, tau = 0.5, client_indices = NULL,

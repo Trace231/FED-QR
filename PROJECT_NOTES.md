@@ -826,6 +826,13 @@ Current report wording:
 - `QR box-dual stale`;
 - `QR box-dual robust`;
 - `QR box-dual stale+robust`.
+- `QR box-dual adaptive`.
+
+自适应升级：
+
+- adaptive staleness: 根据当前 mean client cache age 和目标 stale age 自动放大/缩小 `staleness_rate`，trace 记录 `adaptive_staleness_rate`；
+- adaptive client weighting: 每轮根据各客户端当前 check loss 自动更新 client weights，高 loss 客户端被上调，trace 记录 `adaptive_client_weight_sd` 和 `max_client_weight`；
+- adaptive calibration: `adaptive_calibrate_quantile()` 自动比较 raw、global intercept correction 和 client offset correction，按 global/mean-client/worst-client coverage error 选择修正方案。
 
 新增实验脚本：
 

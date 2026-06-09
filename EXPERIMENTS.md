@@ -45,6 +45,7 @@ This manifest maps the main result files to the scripts and settings that genera
 - Staleness-aware cached directions improve the QR box-dual optimization gap in the extreme non-IID high-quantile simulation.
 - Client-robust weighting improves worst-client loss on Heart Disease and several unbalanced simulation settings, even when the global mean objective is not the winner.
 - Intercept and client-offset calibration sharply reduce high-quantile coverage error on simulation, Heart Disease, NYC Taxi, and Household Power coefficient diagnostics.
+- The `QR box-dual adaptive` variant is registered for future advanced-experiment reruns; it adapts stale decay and client weights from the current cache-age and per-client loss state.
 
 ## Fast Verification
 

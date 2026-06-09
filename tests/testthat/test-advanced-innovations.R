@@ -108,3 +108,61 @@ test_that("advanced QR box-dual method aliases run through fit_fedqr", {
     expect_true(all(c("mean_staleness", "mean_stale_weight", "client_objective") %in% names(fit$trace)))
   }
 })
+
+test_that("adaptive QR box-dual updates stale rates and client weights", {
+  dat <- make_qr_sim(n = 160, p = 5, tau = 0.9, seed = 141)
+  clients <- dirichlet_partition(
+    dat$y,
+    n_clients = 5,
+    alpha = 0.3,
+    seed = 142
+  )
+  fit <- fit_fedqr(
+    "QR box-dual adaptive",
+    dat$X,
+    dat$y,
+    client_indices = clients,
+    tau = 0.9,
+    rounds = 12,
+    clients_per_round = 2,
+    batch_size = 20,
+    trace_every = 4,
+    seed = 143
+  )
+  expect_true(is.finite(fit$objective))
+  expect_true(all(c(
+    "adaptive_staleness_rate",
+    "adaptive_client_weight_sd",
+    "max_client_weight"
+  ) %in% names(fit$trace)))
+  expect_true(any(fit$trace$adaptive_staleness_rate[-1] != fit$trace$adaptive_staleness_rate[1]))
+  expect_gt(stats::sd(fit$fit$client_weights), 0)
+  expect_equal(sum(fit$fit$client_weights), 1)
+})
+
+test_that("adaptive calibration selects a finite coverage correction", {
+  dat <- make_qr_sim(n = 180, p = 5, tau = 0.9, seed = 151)
+  clients <- iid_partition(nrow(dat$X), n_clients = 6, seed = 152)
+  beta <- dat$beta
+  beta[1] <- beta[1] - 0.5
+
+  raw <- calibration_summary(dat$X, dat$y, beta, tau = 0.9, client_indices = clients)
+  cal <- adaptive_calibrate_quantile(
+    dat$X,
+    dat$y,
+    beta,
+    tau = 0.9,
+    client_indices = clients,
+    metric = "mean_client"
+  )
+  after <- calibration_summary(
+    dat$X,
+    dat$y,
+    cal$beta,
+    tau = 0.9,
+    client_indices = clients,
+    offsets = cal$offsets
+  )
+  expect_true(cal$selected_mode %in% c("raw", "global_intercept", "client_offset"))
+  expect_lte(after$mean_client_coverage_error, raw$mean_client_coverage_error + 1e-12)
+})

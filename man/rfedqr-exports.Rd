@@ -6,6 +6,7 @@
 \alias{client_loss_summary}
 \alias{quantile_coverage}
 \alias{calibrate_quantile_intercept}
+\alias{adaptive_calibrate_quantile}
 \alias{calibration_summary}
 \alias{qr_pdhg}
 \alias{fed_qr_spd}

@@ -14,12 +14,17 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
                             step_decay_power = 0,
                             step_decay_offset = 100,
                             primal_clip = NULL,
-                            staleness = c("none", "exponential", "inverse"),
+                            staleness = c("none", "exponential", "inverse", "adaptive"),
                             staleness_rate = 0.03,
                             staleness_floor = 0.25,
                             staleness_normalize = TRUE,
-                            client_weighting = c("sample", "uniform", "sqrt_size", "custom"),
+                            adaptive_staleness_target = NULL,
+                            client_weighting = c("sample", "uniform", "sqrt_size", "custom", "adaptive"),
                             client_weights = NULL,
+                            adaptive_client_power = 1,
+                            adaptive_client_blend = 0.75,
+                            adaptive_client_floor = 0.05,
+                            adaptive_client_smooth = 0.5,
                             verbose = FALSE) {
   penalty <- match.arg(penalty)
   step_rule <- match.arg(step_rule)
@@ -34,7 +39,11 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     dual_relaxation > 0, dual_relaxation <= 1,
     server_momentum >= 0, server_momentum < 1,
     step_decay_power >= 0, step_decay_offset > 0,
-    staleness_rate >= 0, staleness_floor > 0, staleness_floor <= 1
+    staleness_rate >= 0, staleness_floor > 0, staleness_floor <= 1,
+    adaptive_client_power >= 0,
+    adaptive_client_blend >= 0, adaptive_client_blend <= 1,
+    adaptive_client_floor >= 0, adaptive_client_floor < 1,
+    adaptive_client_smooth >= 0, adaptive_client_smooth <= 1
   )
 
   if (intercept) {
@@ -61,11 +70,19 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
   if (is.null(batch_size)) {
     batch_size <- max(client_sizes)
   }
-  client_weights <- client_weight_vector(
+  fixed_client_weights <- client_weight_vector(
     client_sizes,
-    client_weighting = client_weighting,
+    client_weighting = if (client_weighting == "adaptive") "sample" else client_weighting,
     client_weights = client_weights
   )
+  client_weights <- fixed_client_weights
+  if (is.null(adaptive_staleness_target)) {
+    participation_rate <- clients_per_round / n_clients
+    adaptive_staleness_target <- max(
+      1,
+      (1 - participation_rate) / max(participation_rate, .Machine$double.eps)
+    )
+  }
 
   penalty_factor <- rep(1, p)
   if (!is.null(colnames(X)) && colnames(X)[1] == "(Intercept)") {
@@ -106,6 +123,7 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
       y = y[idx],
       v = numeric(length(idx)),
       direction = numeric(p),
+      raw_direction = numeric(p),
       n = length(idx)
     )
   })
@@ -132,7 +150,10 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     client_objective = numeric(n_trace),
     mean_staleness = numeric(n_trace),
     max_staleness = numeric(n_trace),
-    mean_stale_weight = numeric(n_trace)
+    mean_stale_weight = numeric(n_trace),
+    adaptive_staleness_rate = numeric(n_trace),
+    adaptive_client_weight_sd = numeric(n_trace),
+    max_client_weight = numeric(n_trace)
   )
 
   trace_pos <- 1
@@ -150,13 +171,16 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     client_qr_objective(
       X, y, beta, client_indices,
       tau = tau, lambda = lambda, penalty = penalty,
-      client_weighting = client_weighting,
+      client_weighting = if (client_weighting == "adaptive") "custom" else client_weighting,
       client_weights = client_weights,
       penalty_factor = penalty_factor
     ),
     0,
     0,
-    1
+    1,
+    staleness_rate,
+    stats::sd(client_weights),
+    max(client_weights)
   )
 
   for (round in seq_len(rounds)) {
@@ -171,6 +195,26 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     }
     selected_n <- client_sizes[selected]
 
+    if (client_weighting == "adaptive") {
+      local_losses <- vapply(clients, function(client) {
+        residual <- as.numeric(client$y - client$X %*% beta_bar)
+        mean(check_loss(residual, tau))
+      }, numeric(1))
+      loss_center <- sum(fixed_client_weights * local_losses)
+      if (is.finite(loss_center) && loss_center > .Machine$double.eps) {
+        relative_loss <- pmax(local_losses / loss_center, .Machine$double.eps)
+        raw_weights <- fixed_client_weights * relative_loss^adaptive_client_power
+        raw_weights <- raw_weights / sum(raw_weights)
+        floored_weights <- adaptive_client_floor / n_clients +
+          (1 - adaptive_client_floor) * raw_weights
+        target_weights <- (1 - adaptive_client_blend) * fixed_client_weights +
+          adaptive_client_blend * floored_weights
+        client_weights <- (1 - adaptive_client_smooth) * client_weights +
+          adaptive_client_smooth * target_weights
+        client_weights <- client_weights / sum(client_weights)
+      }
+    }
+
     selected_direction <- numeric(p)
     for (j in selected) {
       client <- clients[[j]]
@@ -183,33 +227,39 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
       client$v[local_idx] <- (1 - dual_relaxation) * client$v[local_idx] +
         dual_relaxation * v_candidate
 
-      client$direction <- client_weights[j] *
-        as.numeric(crossprod(client$X, client$v) / client$n)
+      client$raw_direction <- as.numeric(crossprod(client$X, client$v) / client$n)
+      client$direction <- client_weights[j] * client$raw_direction
       selected_direction <- selected_direction +
         (client_weights[j] / sum(client_weights[selected])) *
-          as.numeric(crossprod(client$X, client$v) / client$n)
+          client$raw_direction
       clients[[j]] <- client
     }
 
     client_age <- client_age + 1L
     client_age[selected] <- 0L
+    adaptive_rate_t <- staleness_rate
+    if (staleness == "adaptive") {
+      age_pressure <- mean(client_age) / max(adaptive_staleness_target, .Machine$double.eps)
+      adaptive_rate_t <- staleness_rate * pmax(0.25, age_pressure)
+    }
     stale_weight <- switch(
       staleness,
       none = rep(1, n_clients),
       exponential = pmax(staleness_floor, exp(-staleness_rate * client_age)),
-      inverse = pmax(staleness_floor, 1 / (1 + staleness_rate * client_age))
+      inverse = pmax(staleness_floor, 1 / (1 + staleness_rate * client_age)),
+      adaptive = pmax(staleness_floor, exp(-adaptive_rate_t * client_age))
     )
-    aggregation_weight <- stale_weight
+    aggregation_weight <- client_weights * stale_weight
     if (staleness != "none" && isTRUE(staleness_normalize)) {
-      denom <- sum(client_weights * stale_weight)
+      denom <- sum(aggregation_weight)
       if (denom > .Machine$double.eps) {
-        aggregation_weight <- stale_weight / denom
+        aggregation_weight <- aggregation_weight / denom
       }
     }
 
     primal_direction <- if (aggregation == "cached") {
       Reduce("+", Map(function(client, weight) {
-        weight * client$direction
+        weight * client$raw_direction
       }, clients, aggregation_weight))
     } else {
       selected_direction
@@ -253,17 +303,20 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
         eta_t,
         sigma_t,
         direction_norm,
-        client_qr_objective(
-          X, y, beta, client_indices,
-          tau = tau, lambda = lambda, penalty = penalty,
-          client_weighting = client_weighting,
-          client_weights = client_weights,
-          penalty_factor = penalty_factor
-        ),
-        mean(client_age),
-        max(client_age),
-        mean(stale_weight)
-      )
+          client_qr_objective(
+            X, y, beta, client_indices,
+            tau = tau, lambda = lambda, penalty = penalty,
+            client_weighting = if (client_weighting == "adaptive") "custom" else client_weighting,
+            client_weights = client_weights,
+            penalty_factor = penalty_factor
+          ),
+          mean(client_age),
+          max(client_age),
+          mean(stale_weight),
+          adaptive_rate_t,
+          stats::sd(client_weights),
+          max(client_weights)
+        )
       if (verbose) {
         message(sprintf(
           "round=%d objective=%.6f dual=[%.3f, %.3f]",
@@ -295,6 +348,7 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     batch_size = batch_size,
     client_sizes = client_sizes,
     client_weights = client_weights,
+    fixed_client_weights = fixed_client_weights,
     client_weighting = client_weighting,
     dual_box = c(lower, upper),
     dual_relaxation = dual_relaxation,
@@ -305,6 +359,11 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     staleness = staleness,
     staleness_rate = staleness_rate,
     staleness_floor = staleness_floor,
-    staleness_normalize = staleness_normalize
+    staleness_normalize = staleness_normalize,
+    adaptive_staleness_target = adaptive_staleness_target,
+    adaptive_client_power = adaptive_client_power,
+    adaptive_client_blend = adaptive_client_blend,
+    adaptive_client_floor = adaptive_client_floor,
+    adaptive_client_smooth = adaptive_client_smooth
   )
 }

@@ -826,6 +826,8 @@ This variant is available through:
 
 The trace records `mean_staleness`, `max_staleness`, and `mean_stale_weight`.
 
+The adaptive staleness variant uses the observed mean cache age to adjust the decay rate during training. When the cache is older than the target age, the effective decay rate increases; when the cache is fresh, the rate relaxes. The trace records the resulting `adaptive_staleness_rate`.
+
 ### Client-Robust Objective
 
 The original objective uses sample-average weighting, equivalent to client weights `w_j = n_j / n`. This is appropriate for global empirical risk, but in highly unbalanced federated data it can underweight small but important clients.
@@ -851,6 +853,8 @@ w_j X_j^T v_j / n_j.
 
 When `client_weighting = "sample"`, this exactly recovers the original direction. The robust aliases currently use uniform client weighting.
 
+The adaptive client-robust variant updates client weights during training from the current per-client check loss. Clients with larger current loss receive larger weight, with smoothing and floor controls to avoid unstable jumps. This makes the robust module data-adaptive rather than fixed to uniform weighting.
+
 ### Calibration-Aware High-Quantile Correction
 
 High quantile regression should be evaluated not only by check loss but also by coverage:
@@ -869,11 +873,14 @@ These utilities are exposed as:
 
 - `quantile_coverage()`;
 - `calibrate_quantile_intercept()`;
+- `adaptive_calibrate_quantile()`;
 - `calibration_summary()`.
+
+The adaptive calibration routine compares raw prediction, global intercept correction, and client-offset correction, then chooses the candidate with the lowest requested coverage error metric.
 
 ### Empirical Reading
 
-The advanced experiment suite compares `QR box-dual`, `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `FSPG-smooth`, and `FedSPD-check` on hard/extreme non-IID simulation and Heart Disease.
+The advanced experiment suite compares `QR box-dual`, `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`, `FSPG-smooth`, and `FedSPD-check` on hard/extreme non-IID simulation and Heart Disease.
 
 Observed pattern:
 

@@ -60,6 +60,7 @@ fedqr_default_method_cols <- function(methods) {
     "QR box-dual stale" = "#0072B2",
     "QR box-dual robust" = "#CC79A7",
     "QR box-dual stale+robust" = "#009E73",
+    "QR box-dual adaptive" = "#E7298A",
     "FSPG-smooth" = "#984EA3",
     "FedSubGrad" = "#4DAF4A",
     "FedSPD-check" = "#D95F02",
