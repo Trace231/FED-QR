@@ -73,6 +73,7 @@ result$summary
 - `make_experiment_dirs()`, `save_experiment_outputs()`, `plot_convergence()`, `plot_final_gap()`: experiment utilities.
 - `CONVERGENCE_THEORY.tex`: LaTeX convergence-rate section for deterministic and stochastic QR box-dual FedPDHG.
 - `CONVERGENCE_THEORY_CN.tex` / `CONVERGENCE_THEORY_CN.pdf`: Chinese standalone convergence-rate note.
+- `CONVERGENCE_THEORY_DETAILED_CN.tex` / `CONVERGENCE_THEORY_DETAILED_CN.pdf`: 严格中文收敛阶数证明，包含定义、假设、引理、定理和推论。
 
 ## Reproducing Experiments
 

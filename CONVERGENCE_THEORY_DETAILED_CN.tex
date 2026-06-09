@@ -1,0 +1,759 @@
+\documentclass[UTF8,a4paper,11pt]{ctexart}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+
+\geometry{margin=1in}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\newtheorem{definition}{定义}
+\newtheorem{assumption}{假设}
+\newtheorem{lemma}{引理}
+\newtheorem{theorem}{定理}
+\newtheorem{corollary}{推论}
+\newtheorem{remark}{说明}
+\renewcommand{\proofname}{证明}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\V}{\mathcal{V}}
+\newcommand{\B}{\mathcal{B}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\Gap}{\mathcal{G}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+
+\title{分位数回归盒对偶联邦原始--对偶混合梯度法的严格收敛阶数证明}
+\author{项目组}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本文给出分位数回归盒对偶联邦原始--对偶混合梯度法在一个明确随机联邦模型下的收敛阶数证明。
+证明中显式定义客户端抽样、用户小批量抽样、缓存方向以及陈旧偏差，并给出依赖客户端参与数、小批量大小、客户端不均衡因子和最大缓存延迟的收敛界。
+主要结论如下：在全客户端、全样本的确定性情形下，遍历原始--对偶间隙具有 $\mathcal{O}(1/T)$ 收敛阶数；在随机联邦、部分客户端参与和小批量更新下，即使不使用方差缩减，也可以得到 $\mathcal{O}(1/\sqrt{T})$ 的期望遍历间隙界。方差缩减可以降低方差常数，但不是得到该阶数的必要条件。
+\end{abstract}
+
+\section{问题、联邦划分与鞍点形式}
+
+\begin{definition}[带惩罚的分位数回归问题]
+给定数据 $\{(x_i,y_i)\}_{i=1}^n$，其中 $x_i\in\R^p$，考虑
+\begin{equation}
+    \min_{\beta\in\B}
+    F(\beta)
+    :=
+    \frac{1}{n}\sum_{i=1}^n
+    \rho_\tau(y_i-x_i^\top\beta)
+    +
+    r(\beta),
+    \label{eq:primal}
+\end{equation}
+其中 $\B\subset\R^p$ 是闭凸有界集合，$r$ 是真闭凸惩罚函数，
+\[
+    \rho_\tau(u)=u\bigl(\tau-\mathbf{1}\{u<0\}\bigr),
+    \qquad \tau\in(0,1),
+\]
+为分位数回归的检查损失。
+\end{definition}
+
+\begin{remark}
+这里显式加入有界集合 $\B$，是为了使随机误差项中的内积具有有限上界。在实际算法中，这可以由投影、参数截断、强制惩罚项，或者有界水平集条件保证。若使用最小最大凹惩罚或平滑截断绝对偏差惩罚等非凸惩罚，则严格全局鞍点收敛结论需改写为驻点型结论；本文证明针对凸惩罚情形。
+\end{remark}
+
+数据被划分到 $m$ 个客户端：
+\[
+    \mathcal{D}_1,\ldots,\mathcal{D}_m,\qquad
+    n_j=|\mathcal{D}_j|,\qquad
+    q_j=\frac{n_j}{n},\qquad
+    \sum_{j=1}^m q_j=1.
+\]
+客户端 $j$ 的设计矩阵和对偶变量分别记为 $X_j$ 与 $v_j$。
+
+\begin{definition}[盒对偶表示]
+检查损失满足芬歇尔盒对偶表示
+\begin{equation}
+    \rho_\tau(u)
+    =
+    \max_{v\in[\tau-1,\tau]} vu.
+    \label{eq:box-dual}
+\end{equation}
+因此，问题 \eqref{eq:primal} 等价于凸凹鞍点问题
+\begin{equation}
+    \min_{\beta\in\B}
+    \max_{v\in\V}
+    \mathcal{L}(\beta,v)
+    :=
+    r(\beta)
+    +
+    \frac{1}{n}v^\top(y-X\beta),
+    \qquad
+    \V=[\tau-1,\tau]^n.
+    \label{eq:saddle}
+\end{equation}
+\end{definition}
+
+\begin{definition}[客户端局部方向与全量方向]
+定义客户端 $j$ 的局部方向为
+\begin{equation}
+    d_j(v_j)
+    :=
+    \frac{1}{n_j}X_j^\top v_j.
+    \label{eq:local-direction}
+\end{equation}
+全量原始变量更新方向为
+\begin{equation}
+    g(v)
+    :=
+    \frac{1}{n}X^\top v
+    =
+    \sum_{j=1}^m q_j d_j(v_j).
+    \label{eq:full-direction}
+\end{equation}
+分位数回归盒对偶联邦原始--对偶混合梯度法在服务器端使用 $g(v)$ 或其随机联邦估计量更新 $\beta$。
+\end{definition}
+
+\section{基本假设与有界性引理}
+
+\begin{assumption}[有界性与凸性]
+\label{assump:bounded}
+存在常数 $R,D_\beta,Y_\B<\infty$，使得：
+\begin{enumerate}[leftmargin=2em]
+    \item 对所有样本，$\norm{x_i}\le R$；
+    \item 集合 $\B$ 的直径不超过 $D_\beta$，即任意 $\beta,\beta'\in\B$ 满足
+    \[
+        \norm{\beta-\beta'}\le D_\beta;
+    \]
+    \item 对所有 $\beta\in\B$，残差有界：
+    \[
+        |y_i-x_i^\top\beta|\le Y_\B;
+    \]
+    \item $r$ 是真闭凸函数，并且其近端映射在 $\B$ 上良定义。
+\end{enumerate}
+\end{assumption}
+
+\begin{assumption}[鞍点存在]
+\label{assump:saddle}
+鞍点问题 \eqref{eq:saddle} 至少存在一个鞍点，记为
+$(\beta^\star,v^\star)$。也就是说，对任意 $(\beta,v)\in\B\times\V$，
+\[
+    \mathcal{L}(\beta^\star,v)
+    \le
+    \mathcal{L}(\beta^\star,v^\star)
+    \le
+    \mathcal{L}(\beta,v^\star).
+\]
+在本文假设下，若 $\B$ 非空紧凸、$\V$ 非空紧凸，且 $r$ 在 $\B$ 上下半连续，
+则该条件由极小极大定理保证。
+\end{assumption}
+
+\begin{lemma}[局部方向有界]
+\label{lem:direction-bound}
+令
+\[
+    V_\tau:=\max\{\tau,1-\tau\}.
+\]
+由于 $v_i\in[\tau-1,\tau]$，对任意客户端 $j$ 和任意 $v_j$，有
+\begin{equation}
+    \norm{d_j(v_j)}
+    \le
+    R V_\tau
+    =:G.
+    \label{eq:G-bound}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+由三角不等式和假设 \ref{assump:bounded}，
+\[
+    \norm{d_j(v_j)}
+    =
+    \left\|
+    \frac{1}{n_j}\sum_{i\in\mathcal{D}_j}x_i v_i
+    \right\|
+    \le
+    \frac{1}{n_j}
+    \sum_{i\in\mathcal{D}_j}
+    \norm{x_i}|v_i|
+    \le
+    RV_\tau.
+\]
+\end{proof}
+
+\section{确定性全量方法的 \texorpdfstring{$\mathcal{O}(1/T)$}{一除以T} 阶}
+
+先考虑没有任何随机性的基准情形：每一轮所有客户端都参与，并且每个客户端都刷新全部本地对偶变量。令
+\[
+    K_0=-X/n.
+\]
+
+\begin{assumption}[确定性步长条件]
+\label{assump:det}
+步长 $\eta,\sigma>0$ 满足
+\begin{equation}
+    \eta\sigma \norm{K_0}_2^2
+    =
+    \eta\sigma \frac{\norm{X}_2^2}{n^2}
+    <1.
+    \label{eq:det-step}
+\end{equation}
+\end{assumption}
+
+\begin{theorem}[确定性全量方法的遍历收敛阶数]
+\label{thm:det}
+在假设 \ref{assump:bounded}、\ref{assump:saddle} 和 \ref{assump:det} 下，
+令 $(\beta^t,v^t)$ 为全量确定性盒对偶原始--对偶混合梯度迭代。定义
+\[
+    \bar{\beta}^T=\frac{1}{T}\sum_{t=1}^T\beta^t,
+    \qquad
+    \bar{v}^T=\frac{1}{T}\sum_{t=1}^T v^t.
+\]
+若 $(\beta^\star,v^\star)$ 是 \eqref{eq:saddle} 的鞍点，则
+\begin{equation}
+    \Gap(\bar{\beta}^T,\bar{v}^T)
+    :=
+    \mathcal{L}(\bar{\beta}^T,v^\star)
+    -
+    \mathcal{L}(\beta^\star,\bar{v}^T)
+    \le
+    \frac{1}{T}
+    \left(
+        \frac{\norm{\beta^\star-\beta^0}^2}{2\eta}
+        +
+        \frac{\norm{v^\star-v^0}^2}{2\sigma}
+    \right).
+    \label{eq:det-rate}
+\end{equation}
+因此确定性全量方法的遍历原始--对偶间隙为 $\mathcal{O}(1/T)$。
+\end{theorem}
+
+\begin{proof}
+问题 \eqref{eq:saddle} 是标准凸凹鞍点问题：
+\[
+    r(\beta)+\langle K_0\beta,v\rangle-h^\ast(v),
+    \qquad
+    h^\ast(v):=-v^\top y/n+\iota_{\V}(v),
+\]
+其中 $\iota_\V$ 是盒集合 $\V$ 的示性函数。对偶变量更新是 $h^\ast$ 的近端步骤，即投影到 $\V$；原始变量更新是 $r$ 的近端步骤。
+由原始--对偶混合梯度法的一步不等式，在 \eqref{eq:det-step} 下，对任意 $(\beta,v)\in\B\times\V$ 有
+\begin{align}
+    \mathcal{L}(\beta^{t+1},v)
+    -
+    \mathcal{L}(\beta,v^{t+1})
+    &\le
+    \frac{1}{2\eta}
+    \left(
+        \norm{\beta-\beta^t}^2
+        -
+        \norm{\beta-\beta^{t+1}}^2
+    \right)
+    \nonumber\\
+    &\quad+
+    \frac{1}{2\sigma}
+    \left(
+        \norm{v-v^t}^2
+        -
+        \norm{v-v^{t+1}}^2
+    \right).
+    \label{eq:pdhg-one-step}
+\end{align}
+令 $(\beta,v)=(\beta^\star,v^\star)$，并对 $t=0,\ldots,T-1$ 求和，右端平方距离项望远镜相消。再利用 $\mathcal{L}$ 对 $\beta$ 的凸性和对 $v$ 的凹性，将平均间隙转化为遍历平均点处的间隙，即得到 \eqref{eq:det-rate}。
+\end{proof}
+
+\section{客户端抽样与小批量方差}
+
+下面给出随机联邦方向估计的显式方差界。
+
+\subsection{无缓存偏差时的随机方向估计}
+
+每轮从分布 $\{\pi_j\}_{j=1}^m$ 中有放回抽取 $K$ 个客户端，记为
+$J_{t,1},\ldots,J_{t,K}$，其中 $\pi_j>0$ 且 $\sum_j\pi_j=1$。
+在客户端 $j$ 上，用大小为 $B_j$ 的用户小批量构造局部方向估计 $\widehat d_j^t$，满足
+\begin{equation}
+    \E[\widehat d_j^t\mid\F_t]=d_j(v_j^t),
+    \qquad
+    \E\left[
+    \norm{\widehat d_j^t-d_j(v_j^t)}^2
+    \mid\F_t
+    \right]
+    \le
+    \frac{G^2}{B_j}.
+    \label{eq:local-batch-var}
+\end{equation}
+其中 $G=RV_\tau$ 来自引理 \ref{lem:direction-bound}。
+
+\begin{definition}[逆概率加权方向估计]
+定义全局方向估计量
+\begin{equation}
+    \widehat g^t
+    =
+    \frac{1}{K}
+    \sum_{\ell=1}^K
+    \frac{q_{J_{t,\ell}}}{\pi_{J_{t,\ell}}}
+    \widehat d_{J_{t,\ell}}^t.
+    \label{eq:ht-estimator}
+\end{equation}
+该形式是标准逆概率加权估计，用于修正客户端非均匀抽样带来的偏差。
+\end{definition}
+
+\begin{lemma}[客户端抽样与小批量方差界]
+\label{lem:variance}
+在上述抽样模型下，
+\begin{equation}
+    \E[\widehat g^t\mid\F_t]
+    =
+    g(v^t),
+    \label{eq:unbiased}
+\end{equation}
+且存在一个绝对常数 $c_0>0$，使得
+\begin{equation}
+    \E\left[
+    \norm{\widehat g^t-g(v^t)}^2
+    \mid\F_t
+    \right]
+    \le
+    \frac{c_0G^2}{K}
+    \sum_{j=1}^m
+    \frac{q_j^2}{\pi_j}
+    \left(
+        1+\frac{1}{B_j}
+    \right)
+    =:\Sigma_{K,B}^2.
+    \label{eq:variance-bound}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+无偏性由
+\[
+    \E\left[
+    \frac{q_{J}}{\pi_J}\widehat d_J^t
+    \mid\F_t
+    \right]
+    =
+    \sum_{j=1}^m
+    \pi_j
+    \frac{q_j}{\pi_j}
+    d_j(v_j^t)
+    =
+    \sum_{j=1}^m q_j d_j(v_j^t)
+    =
+    g(v^t)
+\]
+得到。由于 $K$ 次抽样条件独立，
+\[
+    \E\left[
+    \norm{\widehat g^t-g(v^t)}^2
+    \mid\F_t
+    \right]
+    \le
+    \frac{1}{K}
+    \E\left[
+    \left.
+    \left\|
+    \frac{q_J}{\pi_J}\widehat d_J^t
+    \right\|^2
+    \right|\F_t
+    \right].
+\]
+又有
+\[
+    \E[\norm{\widehat d_j^t}^2\mid\F_t]
+    \le
+    2\norm{d_j(v_j^t)}^2
+    +
+    2\E[\norm{\widehat d_j^t-d_j(v_j^t)}^2\mid\F_t]
+    \le
+    2G^2\left(1+\frac{1}{B_j}\right).
+\]
+代入上式即可得到 \eqref{eq:variance-bound}，其中绝对常数可取 $c_0=2$。
+\end{proof}
+
+\begin{remark}[客户端不均衡因子]
+若 $\pi_j=1/m$，则
+\[
+    \sum_{j=1}^m\frac{q_j^2}{\pi_j}
+    =
+    m\sum_{j=1}^m q_j^2.
+\]
+当客户端样本量均衡时，$q_j=1/m$，该项等于 $1$；当客户端样本量高度不均衡时，该项变大。因此，客户端样本量不均衡会放大随机方向方差。
+\end{remark}
+
+\section{缓存方向的陈旧偏差}
+
+实际的缓存聚合并不总是使用当前 $d_j(v_j^t)$，而是使用客户端上次被刷新时的方向。
+记客户端 $j$ 在第 $t$ 轮服务器可见的缓存时间为 $\tau_j(t)\le t$，缓存方向为
+\[
+    \widetilde d_j^t
+    :=
+    d_j(v_j^{\tau_j(t)}).
+\]
+缓存全量聚合方向为
+\[
+    \widetilde g^t
+    =
+    \sum_{j=1}^m q_j \widetilde d_j^t.
+\]
+
+\begin{assumption}[有界缓存延迟]
+\label{assump:delay}
+存在整数 $A\ge 0$，使得
+\[
+    0\le t-\tau_j(t)\le A,
+    \qquad
+    \text{对所有 }j,t\text{ 成立}.
+\]
+此外，对偶变量步长 $\sigma_t$ 非增。
+\end{assumption}
+
+\begin{lemma}[陈旧偏差显式界]
+\label{lem:stale}
+在假设 \ref{assump:bounded} 和 \ref{assump:delay} 下，
+\begin{equation}
+    \norm{\widetilde g^t-g(v^t)}
+    \le
+    RY_\B
+    \sum_{s=t-A}^{t-1}\sigma_s
+    \le
+    RY_\B A\sigma_{t-A},
+    \label{eq:stale-bound}
+\end{equation}
+其中当 $t-A<0$ 时求和从 $0$ 开始。
+\end{lemma}
+
+\begin{proof}
+对偶变量的盒投影更新满足
+\[
+    v_i^{s+1}
+    =
+    \Pi_{[\tau-1,\tau]}
+    \left(
+        v_i^s+\sigma_s(y_i-x_i^\top\bar\beta^s)
+    \right),
+\]
+或其小批量分块版本。投影算子是非扩张的，因此对任意被更新的坐标，
+\[
+    |v_i^{s+1}-v_i^s|
+    \le
+    \sigma_s |y_i-x_i^\top\bar\beta^s|
+    \le
+    \sigma_s Y_\B.
+\]
+未被更新的坐标变化为 $0$，所以上式仍成立。于是对客户端 $j$，
+\begin{align*}
+    \norm{d_j(v_j^t)-d_j(v_j^{\tau_j(t)})}
+    &=
+    \left\|
+    \frac{1}{n_j}
+    X_j^\top
+    (v_j^t-v_j^{\tau_j(t)})
+    \right\|  \\
+    &\le
+    \frac{1}{n_j}
+    \sum_{i\in\mathcal{D}_j}
+    \norm{x_i}
+    |v_i^t-v_i^{\tau_j(t)}| \\
+    &\le
+    R\sum_{s=\tau_j(t)}^{t-1}\sigma_s Y_\B
+    \le
+    RY_\B\sum_{s=t-A}^{t-1}\sigma_s .
+\end{align*}
+对客户端按 $q_j$ 加权求和，并使用 $\sum_j q_j=1$，即可得到 \eqref{eq:stale-bound}。
+\end{proof}
+
+\section{随机缓存联邦方法的收敛阶数}
+
+令 $\widehat g^t_{\text{缓}}$ 表示实际用于原始变量更新的随机缓存方向。写成
+\[
+    \widehat g^t_{\text{缓}}
+    =
+    g(v^t)
+    +
+    \xi_t
+    +
+    b_t,
+\]
+其中
+\[
+    \E[\xi_t\mid\F_t]=0,
+    \qquad
+    \E[\norm{\xi_t}^2\mid\F_t]\le \Sigma_{K,B}^2,
+    \qquad
+    \norm{b_t}\le \Delta_t.
+\]
+由引理 \ref{lem:stale}，可取
+\[
+    \Delta_t
+    =
+    RY_\B\sum_{s=t-A}^{t-1}\sigma_s.
+\]
+
+\begin{lemma}[随机一步不等式]
+\label{lem:stoch-one-step}
+在假设 \ref{assump:bounded} 下，若原始变量更新使用 $\widehat g^t_{\text{缓}}$，
+则对任意 $(\beta,v)\in\B\times\V$，存在绝对常数 $c_1>0$，使得
+\begin{align}
+    \E_t[
+    \mathcal{L}(\beta^{t+1},v)
+    -
+    \mathcal{L}(\beta,v^{t+1})
+    ]
+    &\le
+    \frac{1}{2\eta_t}
+    \left(
+        \norm{\beta-\beta^t}^2
+        -
+        \E_t\norm{\beta-\beta^{t+1}}^2
+    \right)
+    \nonumber\\
+    &\quad+
+    \frac{1}{2\sigma_t}
+    \left(
+        \norm{v-v^t}^2
+        -
+        \E_t\norm{v-v^{t+1}}^2
+    \right)
+    \nonumber\\
+    &\quad+
+    c_1\eta_t\Sigma_{K,B}^2
+    +
+    D_\beta\Delta_t,
+    \label{eq:stoch-one-step}
+\end{align}
+其中 $\E_t[\cdot]=\E[\cdot\mid\F_t]$。
+\end{lemma}
+
+\begin{proof}
+与确定性一步不等式相比，唯一差异是原始变量更新方向从 $g(v^t)$ 变成
+$g(v^t)+\xi_t+b_t$，于是多出误差项
+\[
+    \langle \xi_t+b_t,\beta-\beta^{t+1}\rangle.
+\]
+对零均值噪声项，使用杨氏不等式：
+\[
+    \langle \xi_t,\beta-\beta^{t+1}\rangle
+    \le
+    \frac{\eta_t}{2}\norm{\xi_t}^2
+    +
+    \frac{1}{2\eta_t}\norm{\beta-\beta^{t+1}}^2.
+\]
+第二项可吸收到近端三点不等式中的平方距离项；取条件期望并用
+$\E_t\norm{\xi_t}^2\le\Sigma_{K,B}^2$，得到 $c_1\eta_t\Sigma_{K,B}^2$。
+对偏差项，利用 $\beta,\beta^{t+1}\in\B$：
+\[
+    \langle b_t,\beta-\beta^{t+1}\rangle
+    \le
+    \norm{b_t}\norm{\beta-\beta^{t+1}}
+    \le
+    D_\beta\Delta_t.
+\]
+代回确定性一步不等式即得 \eqref{eq:stoch-one-step}。
+\end{proof}
+
+\begin{theorem}[不用方差缩减时的显式 $\mathcal{O}(1/\sqrt{T})$ 阶]
+\label{thm:main}
+假设 \ref{assump:bounded}、\ref{assump:saddle} 和 \ref{assump:delay} 成立。令
+\[
+    \eta_t=\sigma_t=\frac{\gamma}{\sqrt{T}},
+    \qquad
+    t=0,\ldots,T-1,
+\]
+其中 $\gamma$ 足够小，使得原始--对偶混合梯度法的稳定条件成立。则随机缓存联邦盒对偶方法的遍历间隙满足
+\begin{align}
+    \E[
+    \Gap(\bar{\beta}^T,\bar v^T)
+    ]
+    &\le
+    \frac{1}{\sqrt{T}}
+    \left[
+        \frac{D_\beta^2+D_v^2}{2\gamma}
+        +
+        c_1\gamma
+        \frac{c_0G^2}{K}
+        \sum_{j=1}^m
+        \frac{q_j^2}{\pi_j}
+        \left(
+            1+\frac{1}{B_j}
+        \right)
+    \right]
+    \nonumber\\
+    &\quad+
+    \frac{D_\beta}{T}
+    \sum_{t=0}^{T-1}
+    RY_\B
+    \sum_{s=t-A}^{t-1}\sigma_s ,
+    \label{eq:main-rate}
+\end{align}
+其中 $D_v:=\sup_{v,v'\in\V}\norm{v-v'}$。进一步，由
+$\sigma_s=\gamma/\sqrt{T}$ 可得
+\begin{equation}
+    \E[
+    \Gap(\bar{\beta}^T,\bar v^T)
+    ]
+    \le
+    \frac{1}{\sqrt{T}}
+    \left[
+        \frac{D_\beta^2+D_v^2}{2\gamma}
+        +
+        c_1\gamma
+        \frac{c_0G^2}{K}
+        \sum_{j=1}^m
+        \frac{q_j^2}{\pi_j}
+        \left(
+            1+\frac{1}{B_j}
+        \right)
+        +
+        D_\beta RY_\B A\gamma
+    \right].
+    \label{eq:sqrt-rate}
+\end{equation}
+因此，在 $K,B_j,A$ 固定且有界的情况下，不使用方差缩减也有
+\[
+    \E[
+    \Gap(\bar{\beta}^T,\bar v^T)
+    ]
+    =
+    \mathcal{O}(T^{-1/2}).
+\]
+\end{theorem}
+
+\begin{proof}
+记 $\eta=\gamma/\sqrt{T}$。在引理 \ref{lem:stoch-one-step} 中取
+$(\beta,v)=(\beta^\star,v^\star)$，并对
+$t=0,\ldots,T-1$ 求和。平方距离项望远镜相消，得到
+\[
+    \sum_{t=0}^{T-1}
+    \E[
+    \mathcal{L}(\beta^{t+1},v^\star)
+    -
+    \mathcal{L}(\beta^\star,v^{t+1})
+    ]
+    \le
+    \frac{D_\beta^2+D_v^2}{2\eta}
+    +
+    c_1\sum_{t=0}^{T-1}\eta_t\Sigma_{K,B}^2
+    +
+    D_\beta\sum_{t=0}^{T-1}\Delta_t.
+\]
+利用 $\mathcal{L}$ 的凸凹性，将左侧转化为遍历平均点处的间隙，再除以 $T$。
+代入引理 \ref{lem:variance} 的 $\Sigma_{K,B}^2$ 和引理 \ref{lem:stale} 的
+$\Delta_t$，得到 \eqref{eq:main-rate}。最后代入
+$\eta_t=\sigma_t=\gamma/\sqrt{T}$，并使用
+\[
+    \sum_{s=t-A}^{t-1}\sigma_s
+    \le
+    A\gamma/\sqrt{T},
+\]
+即可得到 \eqref{eq:sqrt-rate}。
+\end{proof}
+
+\section{固定步长情形}
+
+\begin{corollary}[固定步长误差邻域]
+若采用固定步长 $\eta_t=\sigma_t=\eta$，同样的推导给出
+\begin{equation}
+    \E[
+    \Gap(\bar{\beta}^T,\bar v^T)
+    ]
+    \le
+    \frac{D_\beta^2+D_v^2}{2\eta T}
+    +
+    c_1\eta\Sigma_{K,B}^2
+    +
+    D_\beta RY_\B A\eta.
+    \label{eq:fixed-rate}
+\end{equation}
+因此固定步长有 $\mathcal{O}(1/T)$ 的暂态下降项，但最终会停在由随机方差和陈旧偏差决定的邻域中：
+\[
+    \mathcal{O}(\eta\Sigma_{K,B}^2)
+    +
+    \mathcal{O}(A\eta).
+\]
+\end{corollary}
+
+\section{陈旧加权、稳健加权、自适应加权与方差缩减}
+
+\paragraph{陈旧加权。}
+如果服务器使用陈旧程度权重 $a_j^t$，并且
+\[
+    0<a_{\min}\le a_j^t\le a_{\max}<\infty,
+    \qquad
+    \sum_{j=1}^m q_j a_j^t=1,
+\]
+则上述证明保持成立，只是 $G$ 和陈旧偏差常数会乘上与 $a_{\max}/a_{\min}$ 有关的因子。
+
+\paragraph{稳健加权。}
+如果使用等客户端权重或自定义客户端权重，则目标从样本平均目标变为
+\[
+    F_w(\beta)
+    =
+    \sum_{j=1}^m
+    w_j
+    \frac{1}{n_j}
+    \sum_{i\in\mathcal{D}_j}
+    \rho_\tau(y_i-x_i^\top\beta)
+    +
+    r(\beta).
+\]
+同样的证明适用于 $F_w$ 对应的鞍点问题。这解释了为什么稳健版本可能牺牲样本平均目标值，却改善最差客户端损失。
+
+\paragraph{自适应加权。}
+若自适应权重 $w_j^t$ 满足有界性和有限总变化量
+\[
+    0<w_{\min}\le w_j^t\le w_{\max}<1,
+    \qquad
+    \sum_{t=0}^{T-1}\norm{w^{t+1}-w^t}_1<\infty,
+\]
+则可视为求解一个缓慢变化的加权鞍点问题序列。收敛界中会多出权重变化项
+\[
+    \frac{1}{T}
+    \sum_{t=0}^{T-1}
+    \norm{w^{t+1}-w^t}_1.
+\]
+若该项为 $\mathcal{O}(T^{-1/2})$ 或更小，则不改变主阶数。
+
+\paragraph{方差缩减。}
+方差缩减不是得到定理 \ref{thm:main} 的必要条件。若方差缩减后的方向满足
+\[
+    \E[
+    \norm{\widehat g_{\rm vr}^t-g(v^t)}^2
+    \mid\F_t]
+    \le
+    \Sigma_{\rm vr}^2
+    \le
+    \Sigma_{K,B}^2,
+\]
+则定理 \ref{thm:main} 仍成立，只需将 $\Sigma_{K,B}^2$ 替换为更小的
+$\Sigma_{\rm vr}^2$。因此，方差缩减改善的是收敛界中的方差常数，而不是在一般非光滑随机联邦设定下把阶数从 $\mathcal{O}(T^{-1/2})$ 直接提升为 $\mathcal{O}(T^{-1})$。
+
+\section{结论}
+
+在明确的有界性、客户端抽样、小批量抽样和有界延迟假设下，我们得到：
+\begin{itemize}[leftmargin=2em]
+    \item 全量确定性盒对偶原始--对偶混合梯度法：
+    \[
+        \Gap(\bar{\beta}^T,\bar v^T)=\mathcal{O}(1/T).
+    \]
+    \item 随机联邦缓存盒对偶方法，不使用方差缩减：
+    \[
+        \E[\Gap(\bar{\beta}^T,\bar v^T)]
+        =
+        \mathcal{O}(1/\sqrt{T}).
+    \]
+    \item 显式常数依赖客户端参与数 $K$、小批量大小 $B_j$、客户端不均衡因子
+    $\sum_j q_j^2/\pi_j$、最大缓存延迟 $A$、协变量上界 $R$ 和残差上界
+    $Y_\B$。
+    \item 固定步长时，方法收敛到由随机方差和陈旧偏差决定的误差邻域。
+    \item 方差缩减可以降低方差常数，但不是证明 $\mathcal{O}(1/\sqrt{T})$ 阶的必要条件。
+\end{itemize}
+
+\end{document}

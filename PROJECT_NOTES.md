@@ -926,18 +926,21 @@ HD 只有 4 个真实 center，适合做真实多中心小数据验证，但不�
 - `CONVERGENCE_THEORY.tex`
 - `CONVERGENCE_THEORY_CN.tex`
 - `CONVERGENCE_THEORY_CN.pdf`
+- `CONVERGENCE_THEORY_DETAILED_CN.tex`
+- `CONVERGENCE_THEORY_DETAILED_CN.pdf`
 
 内容：
 
-- 将 quantile check loss 写成 Fenchel box-dual saddle problem；
-- deterministic full-participation QR box-dual PDHG 的 ergodic primal-dual gap 为 `O(1/T)`；
-- stochastic federated cached QR box-dual 在 bounded variance、bounded stale bias 和 `eta_t = sigma_t = O(1/sqrt(T))` 下为 `O(1/sqrt(T))`；
-- fixed-step stochastic version 收敛到 variance/staleness-dependent neighborhood；
-- robust/stale/adaptive weighting 不改变基本阶数，但改变目标和常数；
-- control-variate VR 不作为收敛必要条件，只降低 variance constant。
+- 将分位数检查损失写成芬歇尔盒对偶鞍点问题；
+- 全客户端、全样本、确定性盒对偶原始--对偶混合梯度法的遍历原始--对偶间隙为 `O(1/T)`；
+- 随机联邦缓存盒对偶方法在有界方差、有界陈旧偏差和 `eta_t = sigma_t = O(1/sqrt(T))` 下为 `O(1/sqrt(T))`；
+- 固定步长随机版本收敛到由随机方差和陈旧偏差决定的误差邻域；
+- 稳健加权、陈旧加权、自适应加权不改变基本阶数，但改变优化目标和常数；
+- 方差缩减不是收敛阶数证明的必要条件，只降低方差常数。
 
 验证：
 
-- 用临时 LaTeX wrapper 编译通过；
-- 中文版本用 `xelatex` 编译通过，输出 `CONVERGENCE_THEORY_CN.pdf`；
-- 需要正式写论文时，可以直接 `\input{CONVERGENCE_THEORY.tex}`，并在主 tex 文件里提供 `amsmath`, `amssymb`, `amsthm` 和 theorem environment。
+- 英文段落版用临时排版外壳编译通过；
+- 中文独立版用 `xelatex` 编译通过，输出 `CONVERGENCE_THEORY_CN.pdf`；
+- 严格中文独立版用 `xelatex` 编译通过，输出 `CONVERGENCE_THEORY_DETAILED_CN.pdf`，共八页；
+- 严格中文独立版包含定义、假设、引理、定理、推论和证明环境，适合作为报告或论文理论部分的基础版本。
