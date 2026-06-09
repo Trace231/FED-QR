@@ -88,3 +88,29 @@ test_that("advanced innovation saved results preserve the main conclusions", {
     expect_lt(client, raw_client)
   }
 })
+
+test_that("large-client scale stress winners come from QR box-dual variants", {
+  result_dir <- test_path("../../results")
+  summary_file <- file.path(result_dir, "scale_stress_summary.csv")
+  client_file <- file.path(result_dir, "scale_stress_client_loss.csv")
+  skip_if_not(file.exists(summary_file))
+  skip_if_not(file.exists(client_file))
+
+  summary_tbl <- read.csv(summary_file)
+  gap <- aggregate(target_gap ~ client_count + heterogeneity + tau + method,
+                   summary_tbl, mean)
+  groups <- interaction(gap$client_count, gap$heterogeneity, gap$tau, drop = TRUE)
+  winners <- vapply(split(seq_len(nrow(gap)), groups), function(idx) {
+    gap$method[idx[which.min(gap$target_gap[idx])]]
+  }, character(1))
+  expect_true(all(grepl("^QR box-dual", winners)))
+
+  client_tbl <- read.csv(client_file)
+  fair <- aggregate(worst_client_loss ~ client_count + heterogeneity + tau + method,
+                    client_tbl, mean)
+  fair_groups <- interaction(fair$client_count, fair$heterogeneity, fair$tau, drop = TRUE)
+  fair_winners <- vapply(split(seq_len(nrow(fair)), fair_groups), function(idx) {
+    fair$method[idx[which.min(fair$worst_client_loss[idx])]]
+  }, character(1))
+  expect_gte(sum(fair_winners == "QR box-dual adaptive"), 4)
+})

@@ -80,6 +80,7 @@ Fast simulation and validation:
 Rscript --vanilla scripts/run_box_dual_comparison.R
 Rscript --vanilla scripts/run_hd_baseline_comparison_with_plots.R
 Rscript --vanilla scripts/run_advanced_innovation_experiment_with_plots.R
+Rscript --vanilla scripts/run_large_client_scale_stress_with_plots.R
 Rscript --vanilla scripts/run_large_realdata_coefficient_evaluation.R
 ```
 

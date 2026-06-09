@@ -888,3 +888,26 @@ Observed pattern:
 - robust weighting improves worst-client loss on Heart Disease and several unbalanced simulation settings;
 - calibration refinement sharply reduces global and client-level coverage error;
 - robust variants do not always minimize the global sample-average objective, which is expected because they optimize a more client-balanced target.
+
+## Large-Client Scale Stress Test
+
+The four-center Heart Disease experiment is useful as a real multi-center medical dataset, but it is too small to stress partial participation and stale cached directions. A separate scale-stress experiment therefore evaluates 50 and 100 clients with only 10% participation per communication round.
+
+Default setting:
+
+- 50 or 100 clients;
+- 5 or 10 selected clients per round;
+- hard and extreme non-IID heterogeneity;
+- highly unbalanced client sizes;
+- `tau = 0.9` and `tau = 0.95`;
+- methods: base, stale, robust, stale+robust, adaptive, FSPG-smooth, and FedSPD-check.
+
+Observed aggregate:
+
+- QR box-dual variants win all 8 target-gap settings;
+- `QR box-dual stale+robust` wins 5/8 target-gap settings;
+- `QR box-dual adaptive` wins 2/8 target-gap settings;
+- `QR box-dual robust` wins 1/8 target-gap settings;
+- `QR box-dual adaptive` wins 6/8 worst-client fairness settings.
+
+This scale test is the strongest evidence for the advanced modules: once the number of clients is large and participation is sparse, stale-aware and robust/adaptive weighting become materially useful.

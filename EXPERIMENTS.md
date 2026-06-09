@@ -20,6 +20,7 @@ This manifest maps the main result files to the scripts and settings that genera
 | Expanded scenario matrix | `scripts/run_expanded_scenario_suite_with_plots.R` | `results/expanded_scenario_summary.csv`, `figures/expanded_scenario_rank_heatmap.png` |
 | QR tuning across scenarios | `scripts/run_qr_box_tuning_expanded_scenarios.R` | `results/qr_tuning_expanded_summary.csv`, `figures/qr_tuning_expanded_gap.png` |
 | Advanced innovation variants | `scripts/run_advanced_innovation_experiment_with_plots.R` | `results/advanced_innovation_summary.csv`, `results/advanced_innovation_client_loss.csv`, `results/advanced_innovation_calibration.csv`, `figures/advanced_innovation_final_gap.png` |
+| Large-client scale stress | `scripts/run_large_client_scale_stress_with_plots.R` | `results/scale_stress_summary.csv`, `results/scale_stress_client_loss.csv`, `figures/scale_stress_final_gap_zoom.png`, `figures/scale_stress_client_fairness_zoom.png` |
 
 ## Penalty Experiments
 
@@ -46,6 +47,7 @@ This manifest maps the main result files to the scripts and settings that genera
 - Client-robust weighting improves worst-client loss on Heart Disease and several unbalanced simulation settings, even when the global mean objective is not the winner.
 - Intercept and client-offset calibration sharply reduce high-quantile coverage error on simulation, Heart Disease, NYC Taxi, and Household Power coefficient diagnostics.
 - The `QR box-dual adaptive` variant is registered for future advanced-experiment reruns; it adapts stale decay and client weights from the current cache-age and per-client loss state.
+- Large-client scale stress with 50/100 clients and 10% participation: all 8 optimization winners are QR box-dual variants; `QR box-dual adaptive` wins 6/8 fairness settings.
 
 ## Fast Verification
 

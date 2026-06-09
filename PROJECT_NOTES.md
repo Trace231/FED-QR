@@ -868,3 +868,48 @@ Current report wording:
 - staleness-aware: improves optimization under partial participation and extreme non-IID;
 - client-robust: improves worst-client and client-distribution fairness;
 - calibration-aware: improves high-quantile coverage after training.
+
+## 大客户端规模压力测试
+
+动机：
+
+HD 只有 4 个真实 center，适合做真实多中心小数据验证，但不足以证明 partial participation、stale cache 和 adaptive client weighting 在高客户端数联邦系统中的价值。因此新增 50/100 客户端规模测试。
+
+新增脚本：
+
+- `scripts/run_large_client_scale_stress_with_plots.R`
+
+默认设定：
+
+- client count: 50 和 100；
+- participation rate: 10%，即 50 客户端每轮选 5 个，100 客户端每轮选 10 个；
+- heterogeneity: hard 和 extreme；
+- tau: 0.9 和 0.95；
+- 每个设置 2 个随机种子；
+- 样本量高度不均衡，单客户端样本数约 25 到 220；
+- 方法：`QR box-dual`, `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`, `FSPG-smooth`, `FedSPD-check`。
+
+新增输出：
+
+- `results/scale_stress_summary.csv`;
+- `results/scale_stress_trace.csv`;
+- `results/scale_stress_client_loss.csv`;
+- `results/scale_stress_design.csv`;
+- `figures/scale_stress_final_gap.png`;
+- `figures/scale_stress_final_gap_zoom.png`;
+- `figures/scale_stress_client_fairness.png`;
+- `figures/scale_stress_client_fairness_zoom.png`;
+- `figures/scale_stress_adaptive_trace.png`.
+
+关键结论：
+
+- 8 个大客户端 optimization 设置中，best target gap 全部来自 QR box-dual family；
+- `QR box-dual stale+robust` 赢 5/8 个 target-gap 设置；
+- `QR box-dual adaptive` 赢 2/8 个 target-gap 设置；
+- `QR box-dual robust` 赢 1/8 个 target-gap 设置；
+- fairness 指标中，`QR box-dual adaptive` 赢 6/8 个 worst-client loss 设置；
+- 50/100 客户端下，FedSPD-check 明显失效，FSPG-smooth 仍是有意义的强 baseline，但在这些 high-client partial-participation settings 中不再是最优。
+
+报告表达建议：
+
+> The large-client scale stress test addresses the limitation of the four-center Heart Disease data. With 50/100 clients and only 10% client participation per round, QR box-dual variants dominate the optimization winners, while the adaptive variant gives the strongest worst-client fairness performance in most settings.
