@@ -918,3 +918,23 @@ HD 只有 4 个真实 center，适合做真实多中心小数据验证，但不�
 报告表达建议：
 
 > The large-client scale stress test addresses the limitation of the four-center Heart Disease data. With 50/100 clients and only 10% client participation per round, QR box-dual variants dominate the optimization winners, while the adaptive+VR variant gives the strongest worst-client fairness performance in most settings.
+
+## 收敛阶数理论草稿
+
+新增文件：
+
+- `CONVERGENCE_THEORY.tex`
+
+内容：
+
+- 将 quantile check loss 写成 Fenchel box-dual saddle problem；
+- deterministic full-participation QR box-dual PDHG 的 ergodic primal-dual gap 为 `O(1/T)`；
+- stochastic federated cached QR box-dual 在 bounded variance、bounded stale bias 和 `eta_t = sigma_t = O(1/sqrt(T))` 下为 `O(1/sqrt(T))`；
+- fixed-step stochastic version 收敛到 variance/staleness-dependent neighborhood；
+- robust/stale/adaptive weighting 不改变基本阶数，但改变目标和常数；
+- control-variate VR 不作为收敛必要条件，只降低 variance constant。
+
+验证：
+
+- 用临时 LaTeX wrapper 编译通过；
+- 需要正式写论文时，可以直接 `\input{CONVERGENCE_THEORY.tex}`，并在主 tex 文件里提供 `amsmath`, `amssymb`, `amsthm` 和 theorem environment。

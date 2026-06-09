@@ -71,6 +71,7 @@ result$summary
 - `fed_subgrad_qr()` and `fed_smooth_qr()`: subgradient and smoothing baselines.
 - `fed_qr_admm()`: federated ADMM baseline.
 - `make_experiment_dirs()`, `save_experiment_outputs()`, `plot_convergence()`, `plot_final_gap()`: experiment utilities.
+- `CONVERGENCE_THEORY.tex`: LaTeX convergence-rate section for deterministic and stochastic QR box-dual FedPDHG.
 
 ## Reproducing Experiments
 
