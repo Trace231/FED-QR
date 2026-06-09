@@ -1,0 +1,16 @@
+.DS_Store
+.Rhistory
+.RData
+.Rproj.user/
+
+*.tar.gz
+*.Rcheck/
+Rplots.pdf
+
+data/
+results/
+figures/
+references/
+
+__pycache__/
+*.pyc

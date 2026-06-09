@@ -1,0 +1,16 @@
+Package: rfedqr
+Type: Package
+Title: Federated Penalized Quantile Regression with Primal-Dual Splitting
+Version: 0.1.0
+Authors@R: person("Feiming", "Wang", role = c("aut", "cre"), email = "feiming@example.com")
+Author: Feiming Wang [aut, cre]
+Maintainer: Feiming Wang <feiming@example.com>
+Description: Prototype implementation of QR-specialized stochastic primal-dual methods for penalized quantile regression.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.0
+Suggests:
+    testthat (>= 3.0.0),
+    quantreg
+Config/testthat/edition: 3

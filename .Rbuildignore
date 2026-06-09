@@ -1,0 +1,15 @@
+^data$
+^results$
+^figures$
+^references$
+^Rplots\.pdf$
+^PROJECT_NOTES\.md$
+^PLAN\.md$
+^PAPER_ALIGNMENT_AUDIT\.md$
+^FEDSPD_DP_REPRODUCTION\.md$
+^NYC_TAXI_LARGE_SCALE\.md$
+^HOUSEHOLD_POWER_LARGE_SCALE\.md$
+^QR_BOX_DUAL_METHOD\.md$
+^EXPERIMENTS\.md$
+^.*\.Rcheck$
+^rfedqr_.*\.tar\.gz$
