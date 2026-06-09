@@ -924,6 +924,8 @@ HD 只有 4 个真实 center，适合做真实多中心小数据验证，但不�
 新增文件：
 
 - `CONVERGENCE_THEORY.tex`
+- `CONVERGENCE_THEORY_CN.tex`
+- `CONVERGENCE_THEORY_CN.pdf`
 
 内容：
 
@@ -937,4 +939,5 @@ HD 只有 4 个真实 center，适合做真实多中心小数据验证，但不�
 验证：
 
 - 用临时 LaTeX wrapper 编译通过；
+- 中文版本用 `xelatex` 编译通过，输出 `CONVERGENCE_THEORY_CN.pdf`；
 - 需要正式写论文时，可以直接 `\input{CONVERGENCE_THEORY.tex}`，并在主 tex 文件里提供 `amsmath`, `amssymb`, `amsthm` 和 theorem environment。

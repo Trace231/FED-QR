@@ -11,5 +11,7 @@
 ^HOUSEHOLD_POWER_LARGE_SCALE\.md$
 ^QR_BOX_DUAL_METHOD\.md$
 ^EXPERIMENTS\.md$
+^CONVERGENCE_THEORY.*\.tex$
+^CONVERGENCE_THEORY.*\.pdf$
 ^.*\.Rcheck$
 ^rfedqr_.*\.tar\.gz$

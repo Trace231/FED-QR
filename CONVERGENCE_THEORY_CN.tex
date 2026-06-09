@@ -1,0 +1,439 @@
+\documentclass[UTF8,a4paper,11pt]{ctexart}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\geometry{margin=1in}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\newtheorem{theorem}{定理}
+\newtheorem{assumption}{假设}
+\newtheorem{remark}{说明}
+
+\title{QR Box-Dual FedPDHG 的收敛阶数说明}
+\author{FED-QR 项目}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本文给出 QR box-dual FedPDHG 方法的一个可用于报告或论文草稿的中文收敛性说明。
+核心结论是：在全客户端、全样本、确定性更新下，QR box-dual PDHG 可以得到
+$\mathcal{O}(1/T)$ 的遍历 primal-dual gap 收敛阶数；在随机联邦设定下，即存在
+客户端随机抽样、用户 mini-batch 抽样以及 cached direction 的 stale 误差时，
+不用方差缩减也可以证明 $\mathcal{O}(1/\sqrt{T})$ 阶的随机收敛率。固定步长时，
+方法通常收敛到一个由随机方差和 stale bias 决定的误差邻域。方差缩减不是收敛
+证明的必要条件，它主要降低随机方差常数并改善稳定性。
+\end{abstract}
+
+\section{问题形式与对偶盒结构}
+
+考虑带惩罚项的分位数回归问题
+\begin{equation}
+    \min_{\beta\in\mathbb{R}^p}
+    F(\beta)
+    :=
+    \frac{1}{n}
+    \sum_{i=1}^n
+    \rho_\tau(y_i-x_i^\top\beta)
+    +
+    r(\beta),
+    \label{eq:primal}
+\end{equation}
+其中
+\[
+    \rho_\tau(u)=u(\tau-\mathbf{1}\{u<0\})
+\]
+是分位数回归的 check loss，$\tau\in(0,1)$ 是分位数水平，$r(\beta)$ 是惩罚项。
+在理论部分，我们先假设 $r$ 是 proper、closed、convex 的函数；如果使用
+MCP/SCAD 等非凸惩罚，则严格全局收敛结论需要改成 stationary-point 类型结论。
+
+check loss 的关键结构是 Fenchel 对偶盒表示：
+\begin{equation}
+    \rho_\tau(u)
+    =
+    \max_{v\in[\tau-1,\tau]} vu .
+\end{equation}
+因此，原问题 \eqref{eq:primal} 可以写成 convex-concave saddle point 问题：
+\begin{equation}
+    \min_{\beta\in\mathbb{R}^p}
+    \max_{v\in\mathcal{V}}
+    \mathcal{L}(\beta,v)
+    :=
+    r(\beta)
+    +
+    \frac{1}{n}
+    v^\top (y-X\beta),
+    \qquad
+    \mathcal{V}:=[\tau-1,\tau]^n .
+    \label{eq:saddle}
+\end{equation}
+QR box-dual 方法的核心正是利用这个盒约束对偶变量：
+\[
+    v_i\in[\tau-1,\tau].
+\]
+算法每轮对 $v_i$ 做盒投影更新，并对 $\beta$ 做 primal proximal update。
+
+\section{确定性全量版本：$\mathcal{O}(1/T)$}
+
+首先考虑最理想的确定性版本：
+
+\begin{itemize}[leftmargin=2em]
+    \item 所有客户端每轮都参与；
+    \item 每个客户端每轮都刷新全部本地样本的 dual variables；
+    \item 不存在客户端抽样随机性；
+    \item 不存在用户 mini-batch 随机性；
+    \item 不存在 stale cached direction。
+\end{itemize}
+
+\begin{assumption}[确定性 PDHG 条件]
+\label{assump:det}
+惩罚项 $r$ 是 proper、closed、convex 的函数。矩阵 $X$ 的谱范数有限。
+步长 $\eta,\sigma>0$ 满足
+\begin{equation}
+    \eta\sigma \frac{\|X\|_2^2}{n^2}<1 .
+    \label{eq:stepsize}
+\end{equation}
+\end{assumption}
+
+\begin{theorem}[确定性 QR box-dual PDHG 的遍历收敛阶数]
+\label{thm:det}
+在假设 \ref{assump:det} 下，令 $(\beta^t,v^t)$ 为全量确定性 QR box-dual PDHG
+生成的迭代序列。定义遍历平均
+\[
+    \bar{\beta}^T
+    =
+    \frac{1}{T}\sum_{t=1}^T\beta^t,
+    \qquad
+    \bar{v}^T
+    =
+    \frac{1}{T}\sum_{t=1}^Tv^t.
+\]
+若 $(\beta^\star,v^\star)$ 是 saddle point，则有
+\begin{equation}
+    \mathcal{G}(\bar{\beta}^T,\bar{v}^T)
+    :=
+    \mathcal{L}(\bar{\beta}^T,v^\star)
+    -
+    \mathcal{L}(\beta^\star,\bar{v}^T)
+    \le
+    \frac{1}{T}
+    \left(
+        \frac{\|\beta^\star-\beta^0\|^2}{2\eta}
+        +
+        \frac{\|v^\star-v^0\|^2}{2\sigma}
+    \right).
+    \label{eq:det-rate}
+\end{equation}
+因此，全量确定性 QR box-dual PDHG 的遍历 primal-dual gap 收敛阶数为
+\[
+    \mathcal{O}(1/T).
+\]
+\end{theorem}
+
+\begin{proof}[证明思路]
+将 \eqref{eq:saddle} 写成标准 PDHG 形式：
+\[
+    r(\beta)+\langle K\beta,v\rangle-h^\ast(v),
+    \qquad
+    K=-X/n,
+\]
+其中
+\[
+    h^\ast(v)
+    =
+    -v^\top y/n+\iota_{\mathcal{V}}(v),
+\]
+$\iota_{\mathcal{V}}$ 是集合 $\mathcal{V}$ 的 indicator function。
+dual update 正是 $h^\ast$ 的 proximal step，也就是带 affine shift 后投影到
+$[\tau-1,\tau]^n$；primal update 是 $r$ 的 proximal step。
+
+由标准 PDHG 一步下降不等式可得，对任意 $(\beta,v)$，
+\begin{align}
+    \mathcal{L}(\beta^{t+1},v)
+    -
+    \mathcal{L}(\beta,v^{t+1})
+    &\le
+    \frac{1}{2\eta}
+    \left(
+        \|\beta-\beta^t\|^2
+        -
+        \|\beta-\beta^{t+1}\|^2
+    \right)
+    \nonumber\\
+    &\quad+
+    \frac{1}{2\sigma}
+    \left(
+        \|v-v^t\|^2
+        -
+        \|v-v^{t+1}\|^2
+    \right).
+    \label{eq:one-step}
+\end{align}
+对 $t=0,\ldots,T-1$ 求和后，右侧平方距离项 telescoping。再令
+$(\beta,v)=(\beta^\star,v^\star)$，并利用 $\mathcal{L}$ 对 $\beta$ 的凸性和
+对 $v$ 的凹性，即可得到 \eqref{eq:det-rate}。
+\end{proof}
+
+\section{随机联邦版本：不用方差缩减时的 $\mathcal{O}(1/\sqrt{T})$}
+
+真实的联邦 QR box-dual 方法不是确定性全量更新，而是包含：
+
+\begin{itemize}[leftmargin=2em]
+    \item 每轮只抽取一部分客户端；
+    \item 被抽中的客户端只用 mini-batch 用户更新 dual variables；
+    \item 未被抽中的客户端使用 cached direction；
+    \item cached direction 会产生 stale bias；
+    \item stochastic direction 存在随机方差。
+\end{itemize}
+
+令 $\widehat{g}^t$ 表示服务器第 $t$ 轮实际使用的随机 cached primal direction，
+$g^t$ 表示理想全量方向。
+
+\begin{assumption}[随机联邦条件]
+\label{assump:stoch}
+存在有限常数 $R,V,\Sigma,D$，使得：
+\begin{enumerate}[leftmargin=2em]
+    \item 协变量有界：$\|x_i\|\le R$；
+    \item dual variable 天然有界：
+    \[
+        v_i^t\in[\tau-1,\tau],
+        \qquad
+        |v_i^t|\le V:=\max\{\tau,1-\tau\};
+    \]
+    \item stochastic direction 方差有界：
+    \begin{equation}
+        \mathbb{E}
+        \left[
+        \left.
+        \|\widehat{g}^t-\mathbb{E}(\widehat{g}^t\mid\mathcal{F}_t)\|^2
+        \right|
+        \mathcal{F}_t
+        \right]
+        \le
+        \Sigma^2;
+        \label{eq:variance}
+    \end{equation}
+    \item stale cache bias 满足
+    \begin{equation}
+        \left\|
+        \mathbb{E}(\widehat{g}^t\mid\mathcal{F}_t)-g^t
+        \right\|
+        \le
+        \Delta_t,
+        \qquad
+        \frac{1}{T}
+        \sum_{t=0}^{T-1}
+        \Delta_t
+        \le
+        \bar{\Delta}_T;
+        \label{eq:bias}
+    \end{equation}
+    \item 迭代点停留在有界 level set 中，其直径不超过 $D$。
+\end{enumerate}
+\end{assumption}
+
+\begin{theorem}[随机联邦 QR box-dual 的收敛阶数]
+\label{thm:stoch}
+在假设 \ref{assump:stoch} 下，令随机联邦 QR box-dual 使用
+\[
+    \eta_t=\sigma_t=\gamma/\sqrt{T}
+\]
+形式的步长，其中 $\gamma$ 足够小以满足 PDHG 稳定条件。则其遍历 primal-dual gap
+满足
+\begin{equation}
+    \mathbb{E}
+    \left[
+    \mathcal{G}(\bar{\beta}^T,\bar{v}^T)
+    \right]
+    \le
+    \frac{C_1}{\sqrt{T}}
+    +
+    C_2\bar{\Delta}_T,
+    \label{eq:stoch-rate}
+\end{equation}
+其中 $C_1$ 与初始距离、$\gamma$、随机方差上界 $\Sigma^2$ 有关，$C_2$ 与有界
+level set 的直径有关。若平均 stale bias 满足
+\[
+    \bar{\Delta}_T=\mathcal{O}(T^{-1/2}),
+\]
+则
+\[
+    \mathbb{E}
+    \left[
+    \mathcal{G}(\bar{\beta}^T,\bar{v}^T)
+    \right]
+    =
+    \mathcal{O}(T^{-1/2}).
+\]
+\end{theorem}
+
+\begin{proof}[证明思路]
+随机情形的证明是在确定性 PDHG 一步不等式的基础上加入随机误差项。
+因为实际使用的是 $\widehat{g}^t$ 而不是 $g^t$，所以多出
+\[
+    \left\langle
+    \widehat{g}^t-g^t,\,
+    \beta^{t+1}-\beta
+    \right\rangle .
+\]
+将误差分解为两部分：
+\[
+    \widehat{g}^t-g^t
+    =
+    \underbrace{
+    \widehat{g}^t
+    -
+    \mathbb{E}(\widehat{g}^t\mid\mathcal{F}_t)
+    }_{\text{martingale noise}}
+    +
+    \underbrace{
+    \mathbb{E}(\widehat{g}^t\mid\mathcal{F}_t)
+    -
+    g^t
+    }_{\text{stale cache bias}}.
+\]
+第一项是零均值随机噪声，由方差上界 \eqref{eq:variance} 控制；第二项由
+\eqref{eq:bias} 控制。
+
+对一步不等式求和后，确定性部分仍然 telescoping；随机噪声部分通过 Young
+不等式产生
+\[
+    \sum_{t=0}^{T-1}
+    \eta_t\Sigma^2
+\]
+量级的项；stale bias 产生
+\[
+    D\sum_{t=0}^{T-1}\Delta_t
+\]
+量级的项。两边除以 $\sum_{t=0}^{T-1}\eta_t$ 后得到
+\[
+    \frac{C}{\sum_{t=0}^{T-1}\eta_t}
+    +
+    \frac{\sum_{t=0}^{T-1}\eta_t^2\Sigma^2}
+    {\sum_{t=0}^{T-1}\eta_t}
+    +
+    C_2\bar{\Delta}_T.
+\]
+取 $\eta_t=\Theta(T^{-1/2})$，即可得到
+\eqref{eq:stoch-rate}。
+\end{proof}
+
+\section{固定步长时的误差邻域}
+
+实际实验中我们常使用固定步长。固定步长下，随机误差不会完全消失，因此更合理的
+结论是收敛到一个误差邻域：
+\begin{equation}
+    \mathbb{E}
+    \left[
+    \mathcal{G}(\bar{\beta}^T,\bar{v}^T)
+    \right]
+    \le
+    \frac{C_3}{\eta T}
+    +
+    C_4\eta\Sigma^2
+    +
+    C_5\bar{\Delta}_T .
+    \label{eq:fixed}
+\end{equation}
+其中第一项是 $\mathcal{O}(1/T)$ 的 transient term，后两项分别来自随机方差和
+stale cache bias。因此固定步长不是严格收敛到零 gap，而是收敛到
+variance/staleness-dependent neighborhood。
+
+\section{stale、robust、adaptive 对理论的影响}
+
+staleness-aware 和 robust/adaptive 方法在服务器聚合时使用客户端权重 $w_j^t$。
+如果这些权重满足
+\[
+    0<w_{\min}\le w_j^t\le w_{\max}<1,
+    \qquad
+    \sum_{j=1}^m w_j^t=1,
+\]
+则上述随机收敛阶数不发生本质变化，只是常数和优化目标发生变化。
+
+\paragraph{sample weighting.}
+如果
+\[
+    w_j = n_j/n,
+\]
+则优化的是原始 sample-average empirical risk。
+
+\paragraph{uniform/custom weighting.}
+如果使用 uniform 或 custom client weighting，则理论对应的目标变为 client-weighted
+分位数回归：
+\begin{equation}
+    F_w(\beta)
+    =
+    \sum_{j=1}^m
+    w_j
+    \frac{1}{n_j}
+    \sum_{i\in\mathcal{D}_j}
+    \rho_\tau(y_i-x_i^\top\beta)
+    +
+    r(\beta).
+\end{equation}
+这解释了为什么 robust 方法可能牺牲 global sample-average objective，却改善
+worst-client loss。
+
+\paragraph{adaptive weighting.}
+adaptive weighting 可以看成优化一个缓慢变化的 client-weighted saddle problem。
+如果权重有界且总变化量有限，例如
+\[
+    \sum_{t=0}^{T-1}
+    \|w^{t+1}-w^t\|_1
+    <
+    \infty,
+\]
+则额外项可以作为 lower-order variation error 加入收敛界中。
+
+\section{方差缩减的作用}
+
+方差缩减不是证明收敛阶数的必要条件。不使用方差缩减时，随机联邦版本已经可以在
+上述假设下得到 $\mathcal{O}(1/\sqrt{T})$ 阶。
+
+control-variate VR 的作用是降低随机方差常数。若校正后的方向
+$\widehat{g}_{\mathrm{vr}}^t$ 满足
+\[
+    \mathbb{E}
+    \left[
+    \left.
+    \|\widehat{g}_{\mathrm{vr}}^t
+    -
+    \mathbb{E}(\widehat{g}_{\mathrm{vr}}^t\mid\mathcal{F}_t)\|^2
+    \right|
+    \mathcal{F}_t
+    \right]
+    \le
+    \Sigma_{\mathrm{vr}}^2
+    \le
+    \Sigma^2,
+\]
+则定理 \ref{thm:stoch} 中的 $\Sigma^2$ 可以替换为更小的
+$\Sigma_{\mathrm{vr}}^2$。因此 VR 改善的是常数，而不是在一般 nonsmooth
+随机联邦设定下直接把阶数从 $\mathcal{O}(1/\sqrt{T})$ 变成
+$\mathcal{O}(1/T)$。
+
+\section{总结}
+
+综上，理论结论可以概括为：
+\begin{itemize}[leftmargin=2em]
+    \item 全量确定性 QR box-dual PDHG：遍历 primal-dual gap 为
+    $\mathcal{O}(1/T)$；
+    \item 随机联邦 QR box-dual，不用方差缩减：在 bounded variance 和 bounded
+    stale bias 条件下为 $\mathcal{O}(1/\sqrt{T})$；
+    \item 固定步长随机版本：收敛到由随机方差和 stale bias 决定的误差邻域；
+    \item robust/adaptive weighting 不改变基本阶数，但改变目标和常数；
+    \item 方差缩减降低 variance constant，主要改善稳定性和公平性，不是主收敛
+    证明的必要条件。
+\end{itemize}
+
+\end{document}
