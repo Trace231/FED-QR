@@ -25,12 +25,17 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
                             adaptive_client_blend = 0.75,
                             adaptive_client_floor = 0.05,
                             adaptive_client_smooth = 0.5,
+                            variance_reduction = c("none", "control_variate"),
+                            vr_alpha = 0.05,
+                            vr_blend = 0.1,
+                            vr_max_correction_ratio = 0.5,
                             verbose = FALSE) {
   penalty <- match.arg(penalty)
   step_rule <- match.arg(step_rule)
   aggregation <- match.arg(aggregation)
   staleness <- match.arg(staleness)
   client_weighting <- match.arg(client_weighting)
+  variance_reduction <- match.arg(variance_reduction)
 
   X <- as.matrix(X)
   y <- as.numeric(y)
@@ -43,7 +48,10 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     adaptive_client_power >= 0,
     adaptive_client_blend >= 0, adaptive_client_blend <= 1,
     adaptive_client_floor >= 0, adaptive_client_floor < 1,
-    adaptive_client_smooth >= 0, adaptive_client_smooth <= 1
+    adaptive_client_smooth >= 0, adaptive_client_smooth <= 1,
+    vr_alpha >= 0, vr_alpha <= 1,
+    vr_blend >= 0, vr_blend <= 1,
+    vr_max_correction_ratio > 0
   )
 
   if (intercept) {
@@ -124,6 +132,8 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
       v = numeric(length(idx)),
       direction = numeric(p),
       raw_direction = numeric(p),
+      corrected_direction = numeric(p),
+      control = numeric(p),
       n = length(idx)
     )
   })
@@ -134,6 +144,10 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
   direction_ema <- numeric(p)
   client_age <- integer(n_clients)
   stale_weight <- rep(1, n_clients)
+  global_control <- numeric(p)
+  vr_correction_norm <- 0
+  raw_direction_variance <- 0
+  corrected_direction_variance <- 0
 
   n_trace <- floor(rounds / trace_every) + 1
   trace <- data.frame(
@@ -153,7 +167,10 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     mean_stale_weight = numeric(n_trace),
     adaptive_staleness_rate = numeric(n_trace),
     adaptive_client_weight_sd = numeric(n_trace),
-    max_client_weight = numeric(n_trace)
+    max_client_weight = numeric(n_trace),
+    vr_correction_norm = numeric(n_trace),
+    raw_direction_variance = numeric(n_trace),
+    corrected_direction_variance = numeric(n_trace)
   )
 
   trace_pos <- 1
@@ -180,7 +197,10 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     1,
     staleness_rate,
     stats::sd(client_weights),
-    max(client_weights)
+    max(client_weights),
+    0,
+    0,
+    0
   )
 
   for (round in seq_len(rounds)) {
@@ -228,11 +248,32 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
         dual_relaxation * v_candidate
 
       client$raw_direction <- as.numeric(crossprod(client$X, client$v) / client$n)
+      if (variance_reduction == "control_variate") {
+        client$control <- (1 - vr_alpha) * client$control + vr_alpha * client$raw_direction
+      }
+      client$corrected_direction <- if (variance_reduction == "control_variate") {
+        proposed <- client$raw_direction - client$control + global_control
+        correction <- proposed - client$raw_direction
+        correction_norm <- sqrt(sum(correction^2))
+        raw_norm <- sqrt(sum(client$raw_direction^2))
+        correction_cap <- vr_max_correction_ratio * max(raw_norm, .Machine$double.eps)
+        if (correction_norm > correction_cap) {
+          correction <- correction * (correction_cap / correction_norm)
+        }
+        client$raw_direction + vr_blend * correction
+      } else {
+        client$raw_direction
+      }
       client$direction <- client_weights[j] * client$raw_direction
       selected_direction <- selected_direction +
         (client_weights[j] / sum(client_weights[selected])) *
-          client$raw_direction
+          client$corrected_direction
       clients[[j]] <- client
+    }
+
+    if (variance_reduction == "control_variate") {
+      controls <- do.call(rbind, lapply(clients, `[[`, "control"))
+      global_control <- as.numeric(crossprod(client_weights, controls))
     }
 
     client_age <- client_age + 1L
@@ -259,10 +300,27 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
 
     primal_direction <- if (aggregation == "cached") {
       Reduce("+", Map(function(client, weight) {
-        weight * client$raw_direction
+        weight * client$corrected_direction
       }, clients, aggregation_weight))
     } else {
       selected_direction
+    }
+
+    if (variance_reduction == "control_variate") {
+      raw_mat <- do.call(rbind, lapply(clients, `[[`, "raw_direction"))
+      corrected_mat <- do.call(rbind, lapply(clients, `[[`, "corrected_direction"))
+      correction_mat <- corrected_mat - raw_mat
+      vr_correction_norm <- sqrt(sum((as.numeric(crossprod(aggregation_weight, correction_mat)))^2))
+      raw_center <- as.numeric(crossprod(aggregation_weight, raw_mat))
+      corrected_center <- as.numeric(crossprod(aggregation_weight, corrected_mat))
+      raw_direction_variance <- sum(aggregation_weight *
+        rowSums((raw_mat - matrix(raw_center, n_clients, p, byrow = TRUE))^2))
+      corrected_direction_variance <- sum(aggregation_weight *
+        rowSums((corrected_mat - matrix(corrected_center, n_clients, p, byrow = TRUE))^2))
+    } else {
+      vr_correction_norm <- 0
+      raw_direction_variance <- 0
+      corrected_direction_variance <- 0
     }
 
     if (server_momentum > 0) {
@@ -315,7 +373,10 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
           mean(stale_weight),
           adaptive_rate_t,
           stats::sd(client_weights),
-          max(client_weights)
+          max(client_weights),
+          vr_correction_norm,
+          raw_direction_variance,
+          corrected_direction_variance
         )
       if (verbose) {
         message(sprintf(
@@ -364,6 +425,11 @@ qr_box_fed_pdhg <- function(X, y, client_indices = NULL, n_clients = 4,
     adaptive_client_power = adaptive_client_power,
     adaptive_client_blend = adaptive_client_blend,
     adaptive_client_floor = adaptive_client_floor,
-    adaptive_client_smooth = adaptive_client_smooth
+    adaptive_client_smooth = adaptive_client_smooth,
+    variance_reduction = variance_reduction,
+    vr_alpha = vr_alpha,
+    vr_blend = vr_blend,
+    vr_max_correction_ratio = vr_max_correction_ratio,
+    global_control = global_control
   )
 }

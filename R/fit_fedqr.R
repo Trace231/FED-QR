@@ -10,6 +10,7 @@ fedqr_methods <- function() {
     "QR box-dual robust",
     "QR box-dual stale+robust",
     "QR box-dual adaptive",
+    "QR box-dual adaptive+VR",
     "FSPG-smooth",
     "FedSubGrad",
     "FedSPD-check",
@@ -38,6 +39,9 @@ match_fedqr_method <- function(method) {
     "qr_box_dual_adaptive" = "QR box-dual adaptive",
     "qr-box-dual-adaptive" = "QR box-dual adaptive",
     "QR box-dual adaptive" = "QR box-dual adaptive",
+    "qr_box_dual_adaptive_vr" = "QR box-dual adaptive+VR",
+    "qr-box-dual-adaptive-vr" = "QR box-dual adaptive+VR",
+    "QR box-dual adaptive+VR" = "QR box-dual adaptive+VR",
     "fspg" = "FSPG-smooth",
     "fspg_smooth" = "FSPG-smooth",
     "FSPG-smooth" = "FSPG-smooth",
@@ -186,6 +190,16 @@ fit_fedqr <- function(method, X, y, client_indices = NULL,
         aggregation = "cached",
         staleness = "adaptive",
         client_weighting = "adaptive"
+      )), control)
+      do.call(qr_box_fed_pdhg, args)
+    },
+    "QR box-dual adaptive+VR" = {
+      args <- merge_control(c(base, list(
+        step_rule = "operator",
+        aggregation = "cached",
+        staleness = "adaptive",
+        client_weighting = "adaptive",
+        variance_reduction = "control_variate"
       )), control)
       do.call(qr_box_fed_pdhg, args)
     },

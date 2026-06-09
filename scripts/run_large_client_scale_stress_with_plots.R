@@ -39,6 +39,7 @@ methods <- c(
   "QR box-dual robust",
   "QR box-dual stale+robust",
   "QR box-dual adaptive",
+  "QR box-dual adaptive+VR",
   "FSPG-smooth",
   "FedSPD-check"
 )
@@ -68,6 +69,19 @@ method_controls <- list(
     adaptive_client_blend = 0.85,
     adaptive_client_floor = 0.05,
     adaptive_client_smooth = 0.5
+  ),
+  "QR box-dual adaptive+VR" = list(
+    step_rule = "box",
+    staleness_rate = 0.05,
+    staleness_floor = 0.35,
+    adaptive_client_power = 1,
+    adaptive_client_blend = 0.85,
+    adaptive_client_floor = 0.05,
+    adaptive_client_smooth = 0.5,
+    variance_reduction = "control_variate",
+    vr_alpha = 0.05,
+    vr_blend = 0.1,
+    vr_max_correction_ratio = 0.5
   ),
   "FedSPD-check" = list(Q = 3, gamma0 = 4)
 )
@@ -291,12 +305,15 @@ plot_panel_bars(
   "Mean worst-client loss"
 )
 
-adaptive_trace <- trace_tbl[trace_tbl$method == "QR box-dual adaptive" &
+adaptive_trace <- trace_tbl[trace_tbl$method %in% c(
+  "QR box-dual adaptive",
+  "QR box-dual adaptive+VR"
+) &
   !is.na(trace_tbl$adaptive_staleness_rate), ]
 if (nrow(adaptive_trace) > 0) {
   adaptive_agg <- aggregate(
     cbind(adaptive_staleness_rate, adaptive_client_weight_sd) ~
-      client_count + heterogeneity + tau + round,
+      client_count + heterogeneity + tau + method + round,
     adaptive_trace,
     mean
   )
@@ -304,7 +321,7 @@ if (nrow(adaptive_trace) > 0) {
                  width = 1600, height = 900, res = 180)
   old <- par(no.readonly = TRUE)
   par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
-  groups <- interaction(adaptive_agg$client_count, adaptive_agg$heterogeneity,
+  groups <- interaction(adaptive_agg$method, adaptive_agg$client_count, adaptive_agg$heterogeneity,
                         adaptive_agg$tau, drop = TRUE)
   plot(NULL, xlim = range(adaptive_agg$round),
        ylim = range(adaptive_agg$adaptive_staleness_rate),

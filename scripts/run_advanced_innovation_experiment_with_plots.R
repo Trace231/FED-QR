@@ -26,6 +26,7 @@ methods <- c(
   "QR box-dual robust",
   "QR box-dual stale+robust",
   "QR box-dual adaptive",
+  "QR box-dual adaptive+VR",
   "FSPG-smooth",
   "FedSPD-check"
 )
@@ -48,6 +49,19 @@ method_controls <- list(
     adaptive_client_blend = 0.85,
     adaptive_client_floor = 0.05,
     adaptive_client_smooth = 0.5
+  ),
+  "QR box-dual adaptive+VR" = list(
+    step_rule = "box",
+    staleness_rate = 0.05,
+    staleness_floor = 0.35,
+    adaptive_client_power = 1,
+    adaptive_client_blend = 0.85,
+    adaptive_client_floor = 0.05,
+    adaptive_client_smooth = 0.5,
+    variance_reduction = "control_variate",
+    vr_alpha = 0.05,
+    vr_blend = 0.1,
+    vr_max_correction_ratio = 0.5
   ),
   "FedSPD-check" = list(Q = 3, gamma0 = 4)
 )

@@ -64,7 +64,7 @@ result$summary
 - `fit_fedqr()`: normalized interface for one method.
 - `run_fedqr_methods()`: runs multiple methods and returns `summary`, `trace`, and `coefficients`.
 - `qr_box_fed_pdhg()`: main QR box-dual federated PDHG solver.
-- `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`: optional advanced variants with staleness-aware cached directions, client-robust weighting, and state-adaptive weighting.
+- `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`, `QR box-dual adaptive+VR`: optional advanced variants with staleness-aware cached directions, client-robust weighting, state-adaptive weighting, and control-variate variance reduction.
 - `client_loss_summary()` and `client_qr_objective()`: client-level fairness and robust-objective diagnostics.
 - `quantile_coverage()`, `calibrate_quantile_intercept()`, `adaptive_calibrate_quantile()`, `calibration_summary()`: high-quantile coverage and calibration refinement tools.
 - `fedspd_dp_qr()`: FedSPD-DP-style consensus baseline.

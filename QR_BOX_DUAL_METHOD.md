@@ -878,9 +878,19 @@ These utilities are exposed as:
 
 The adaptive calibration routine compares raw prediction, global intercept correction, and client-offset correction, then chooses the candidate with the lowest requested coverage error metric.
 
+### Control-Variate Variance Reduction
+
+The `QR box-dual adaptive+VR` variant adds a conservative client-level control variate to the adaptive method. Each client keeps an exponential moving average of its raw dual direction, and the server keeps a weighted global control direction. The cached direction can then be corrected as
+
+```text
+raw_direction_j - control_j + global_control.
+```
+
+The implementation uses a small blend and a correction cap, so the correction reduces stochastic direction dispersion without aggressively removing real client heterogeneity. The trace records `vr_correction_norm`, `raw_direction_variance`, and `corrected_direction_variance`.
+
 ### Empirical Reading
 
-The advanced experiment suite compares `QR box-dual`, `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`, `FSPG-smooth`, and `FedSPD-check` on hard/extreme non-IID simulation and Heart Disease.
+The advanced experiment suite compares `QR box-dual`, `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`, `QR box-dual adaptive+VR`, `FSPG-smooth`, and `FedSPD-check` on hard/extreme non-IID simulation and Heart Disease.
 
 Observed pattern:
 
@@ -906,8 +916,12 @@ Observed aggregate:
 
 - QR box-dual variants win all 8 target-gap settings;
 - `QR box-dual stale+robust` wins 5/8 target-gap settings;
-- `QR box-dual adaptive` wins 2/8 target-gap settings;
+- `QR box-dual adaptive` wins 1/8 target-gap settings;
+- `QR box-dual adaptive+VR` wins 1/8 target-gap settings;
 - `QR box-dual robust` wins 1/8 target-gap settings;
-- `QR box-dual adaptive` wins 6/8 worst-client fairness settings.
+- `QR box-dual adaptive+VR` wins 6/8 worst-client fairness settings;
+- `QR box-dual adaptive+VR` reduces final corrected-direction variance to about 92.8% of raw direction variance on average.
 
 This scale test is the strongest evidence for the advanced modules: once the number of clients is large and participation is sparse, stale-aware and robust/adaptive weighting become materially useful.
+
+The VR result should be interpreted carefully: it improves direction stability and worst-client fairness, but it is not the dominant target-gap optimizer. The best final target gap is still usually obtained by `QR box-dual stale+robust`.

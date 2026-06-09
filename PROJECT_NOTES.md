@@ -827,12 +827,14 @@ Current report wording:
 - `QR box-dual robust`;
 - `QR box-dual stale+robust`.
 - `QR box-dual adaptive`.
+- `QR box-dual adaptive+VR`.
 
 自适应升级：
 
 - adaptive staleness: 根据当前 mean client cache age 和目标 stale age 自动放大/缩小 `staleness_rate`，trace 记录 `adaptive_staleness_rate`；
 - adaptive client weighting: 每轮根据各客户端当前 check loss 自动更新 client weights，高 loss 客户端被上调，trace 记录 `adaptive_client_weight_sd` 和 `max_client_weight`；
 - adaptive calibration: `adaptive_calibrate_quantile()` 自动比较 raw、global intercept correction 和 client offset correction，按 global/mean-client/worst-client coverage error 选择修正方案。
+- control-variate VR: `QR box-dual adaptive+VR` 使用 client-level control variates 校正 cached raw direction，trace 记录 `vr_correction_norm`、`raw_direction_variance` 和 `corrected_direction_variance`。
 
 新增实验脚本：
 
@@ -887,7 +889,7 @@ HD 只有 4 个真实 center，适合做真实多中心小数据验证，但不�
 - tau: 0.9 和 0.95；
 - 每个设置 2 个随机种子；
 - 样本量高度不均衡，单客户端样本数约 25 到 220；
-- 方法：`QR box-dual`, `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`, `FSPG-smooth`, `FedSPD-check`。
+- 方法：`QR box-dual`, `QR box-dual stale`, `QR box-dual robust`, `QR box-dual stale+robust`, `QR box-dual adaptive`, `QR box-dual adaptive+VR`, `FSPG-smooth`, `FedSPD-check`。
 
 新增输出：
 
@@ -905,11 +907,14 @@ HD 只有 4 个真实 center，适合做真实多中心小数据验证，但不�
 
 - 8 个大客户端 optimization 设置中，best target gap 全部来自 QR box-dual family；
 - `QR box-dual stale+robust` 赢 5/8 个 target-gap 设置；
-- `QR box-dual adaptive` 赢 2/8 个 target-gap 设置；
+- `QR box-dual adaptive` 赢 1/8 个 target-gap 设置；
+- `QR box-dual adaptive+VR` 赢 1/8 个 target-gap 设置；
 - `QR box-dual robust` 赢 1/8 个 target-gap 设置；
-- fairness 指标中，`QR box-dual adaptive` 赢 6/8 个 worst-client loss 设置；
+- fairness 指标中，`QR box-dual adaptive+VR` 赢 6/8 个 worst-client loss 设置；
+- `QR box-dual adaptive+VR` 平均将最终 corrected direction variance 降到 raw direction variance 的 92.8%，说明方差缩减确实降低方向离散度；
+- 但 `adaptive+VR` 在 target gap 上多数略弱于 `adaptive`，因此它应被表述为 fairness/variance-stabilization module，而不是主 objective winner；
 - 50/100 客户端下，FedSPD-check 明显失效，FSPG-smooth 仍是有意义的强 baseline，但在这些 high-client partial-participation settings 中不再是最优。
 
 报告表达建议：
 
-> The large-client scale stress test addresses the limitation of the four-center Heart Disease data. With 50/100 clients and only 10% client participation per round, QR box-dual variants dominate the optimization winners, while the adaptive variant gives the strongest worst-client fairness performance in most settings.
+> The large-client scale stress test addresses the limitation of the four-center Heart Disease data. With 50/100 clients and only 10% client participation per round, QR box-dual variants dominate the optimization winners, while the adaptive+VR variant gives the strongest worst-client fairness performance in most settings.

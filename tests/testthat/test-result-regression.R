@@ -112,5 +112,8 @@ test_that("large-client scale stress winners come from QR box-dual variants", {
   fair_winners <- vapply(split(seq_len(nrow(fair)), fair_groups), function(idx) {
     fair$method[idx[which.min(fair$worst_client_loss[idx])]]
   }, character(1))
-  expect_gte(sum(fair_winners == "QR box-dual adaptive"), 4)
+  expect_gte(sum(fair_winners %in% c(
+    "QR box-dual adaptive",
+    "QR box-dual adaptive+VR"
+  )), 4)
 })

@@ -140,6 +140,41 @@ test_that("adaptive QR box-dual updates stale rates and client weights", {
   expect_equal(sum(fit$fit$client_weights), 1)
 })
 
+test_that("adaptive QR box-dual with control-variate VR runs and traces corrections", {
+  dat <- make_qr_sim(n = 180, p = 5, tau = 0.9, seed = 146)
+  clients <- dirichlet_partition(
+    dat$y,
+    n_clients = 6,
+    alpha = 0.4,
+    seed = 147
+  )
+  fit <- fit_fedqr(
+    "QR box-dual adaptive+VR",
+    dat$X,
+    dat$y,
+    client_indices = clients,
+    tau = 0.9,
+    rounds = 15,
+    clients_per_round = 2,
+    batch_size = 20,
+    trace_every = 5,
+    seed = 148
+  )
+  expect_true(is.finite(fit$objective))
+  expect_equal(fit$fit$variance_reduction, "control_variate")
+  expect_true(all(c(
+    "vr_correction_norm",
+    "raw_direction_variance",
+    "corrected_direction_variance"
+  ) %in% names(fit$trace)))
+  expect_true(any(fit$trace$vr_correction_norm[-1] > 0))
+  expect_true(all(is.finite(fit$trace$corrected_direction_variance)))
+  expect_lte(
+    tail(fit$trace$corrected_direction_variance, 1),
+    2 * tail(fit$trace$raw_direction_variance, 1) + 1e-12
+  )
+})
+
 test_that("adaptive calibration selects a finite coverage correction", {
   dat <- make_qr_sim(n = 180, p = 5, tau = 0.9, seed = 151)
   clients <- iid_partition(nrow(dat$X), n_clients = 6, seed = 152)
