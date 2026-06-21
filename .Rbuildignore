@@ -2,6 +2,7 @@
 ^results$
 ^figures$
 ^references$
+^scripts$
 ^Rplots\.pdf$
 ^PROJECT_NOTES\.md$
 ^PLAN\.md$
@@ -15,3 +16,5 @@
 ^CONVERGENCE_THEORY.*\.pdf$
 ^.*\.Rcheck$
 ^rfedqr_.*\.tar\.gz$
+^cran-comments\.md$
+^CRAN_READINESS\.md$

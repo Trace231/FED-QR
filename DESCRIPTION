@@ -2,11 +2,17 @@ Package: rfedqr
 Type: Package
 Title: Federated Penalized Quantile Regression with Primal-Dual Splitting
 Version: 0.1.0
-Authors@R: person("Feiming", "Wang", role = c("aut", "cre"), email = "feiming@example.com")
+Authors@R: person("Feiming", "Wang", role = c("aut", "cre"), email = "wangfeiming@mail.nankai.edu.cn")
 Author: Feiming Wang [aut, cre]
-Maintainer: Feiming Wang <feiming@example.com>
-Description: Prototype implementation of QR-specialized stochastic primal-dual methods for penalized quantile regression.
+Maintainer: Feiming Wang <wangfeiming@mail.nankai.edu.cn>
+Description: Implements federated algorithms for penalized quantile regression,
+    including box-dual primal-dual splitting, smoothing, subgradient, consensus,
+    and alternating direction baselines. The package provides simulation tools,
+    client partition utilities, calibration diagnostics, and unified wrappers for
+    comparing methods under client sampling and local mini-batch sampling.
 License: MIT + file LICENSE
+URL: https://github.com/Trace231/FED-QR
+BugReports: https://github.com/Trace231/FED-QR/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.0
